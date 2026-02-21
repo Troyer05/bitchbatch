@@ -33,6 +33,8 @@ int main() {
         return 0;
     }
 
+    cout << Color::YELLOW << "If you run this the first time, please type   init    and hit enter. Then restart Bitch Batch\n\n" << Color::RESET;
+
     CommandMap commands;
     std::vector<std::string> history;
 

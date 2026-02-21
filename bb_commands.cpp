@@ -12,7 +12,53 @@
 using namespace std;
 
 void registerCommands(CommandMap& commands) {
+    commands["help"] = [&](const std::vector<std::string>&) {
+        cout << "\nAvailable Commands:\n";
+        cout << "------------------------------------------------------------\n";
+
+        cout << "help        - Shows this help overview\n";
+        cout << "cls/clear/c - Clears the screen\n";
+        cout << "exit/exut   - Exits the program\n";
+
+        cout << "l/dir       - Lists directory content (ls -alh)\n";
+        cout << "cd <dir>    - Changes current directory\n";
+        cout << "mk <dir>    - Creates directory and enters it\n";
+        cout << "rm <path>   - Removes file or directory recursively\n";
+
+        cout << "ip          - Shows network interfaces\n";
+        cout << "ports       - Shows open ports and listening services\n";
+        cout << "mem         - Shows RAM usage\n";
+        cout << "disk        - Shows disk usage\n";
+
+        cout << "update      - Runs apt update/upgrade/autoremove\n";
+        cout << "install <p> - Installs apt package\n";
+        cout << "uninstall<p>- Removes apt package completely\n";
+        cout << "init        - Installs common admin tools\n";
+
+        cout << "en <svc>    - Enables systemd service\n";
+        cout << "dis <svc>   - Disables systemd service\n";
+        cout << "start <svc> - Starts service\n";
+        cout << "stop <svc>  - Stops service\n";
+        cout << "restart<svc>- Restarts service\n";
+        cout << "status <svc>- Shows service status\n";
+
+        cout << "e <file>    - Opens file in nano\n";
+        cout << "v <file>    - Opens file in vim\n";
+        cout << "me <file>   - Opens file in mcedit\n";
+        cout << "cl <path>   - Opens ranger file manager\n";
+
+        cout << "search <p>  - Recursively searches for pattern\n";
+        cout << "grub        - Edits grub config and updates it\n";
+        cout << "bash        - Creates and executes temporary bash script\n";
+
+        cout << "------------------------------------------------------------\n\n";
+    };
+
     commands["cls"] = [&](const std::vector<std::string>&) {
+        CLS();
+    };
+
+    commands["clear"] = [&](const std::vector<std::string>&) {
         CLS();
     };
 
@@ -74,8 +120,8 @@ void registerCommands(CommandMap& commands) {
         cout << "\n";
     };
 
-    commands["mem"] = [&](const std::vector<std::string>&) {
-        cmd("free -h");
+    commands["disk"] = [&](const std::vector<std::string>&) {
+        cmd("df -h");
         cout << "\n";
     };
 
@@ -86,11 +132,12 @@ void registerCommands(CommandMap& commands) {
 
     commands["init"] = [&](const std::vector<std::string>&) {
         cmd("sudo apt update");
+        cmd("sudo apt install -y curl");
+        cmd("sudo apt install -y wget");
+        cmd("sudo apt install -y git");
         cmd("sudo apt install -y htop");
         cmd("sudo apt install -y btop");
         cmd("sudo apt install -y iptraf");
-        cmd("sudo apt install -y wget");
-        cmd("sudo apt install -y curl");
         cmd("sudo apt install -y atop");
         cmd("sudo apt install -y iotop");
         cmd("sudo apt install -y glances");
@@ -99,6 +146,8 @@ void registerCommands(CommandMap& commands) {
         cmd("sudo apt install -y lolcat");
         cmd("sudo apt install -y nano");
         cmd("sudo apt install -y vim");
+        cmd("sudo apt install -y ranger");
+        cmd("sudo apt install -y mc");
 
         cout << "\n";
     };
@@ -286,5 +335,47 @@ void registerCommands(CommandMap& commands) {
         searchRecursive(fs::current_path().string(), args[1]);
 
         std::cout << "\n";
+    };
+
+    commands["cl"] = [&](const std::vector<std::string>& args) {
+        if (args.size() < 2) {
+            cmd("ranger .");
+            return;
+        }
+
+        std::vector<std::string> p = {"ranger"};
+        for (size_t i = 1; i < args.size(); i++) p.push_back(args[i]);
+
+        cmdArgs(p);
+
+        cout << "\n";
+    };
+
+    commands["me"] = [&](const std::vector<std::string>& args) {
+        if (args.size() < 2) {
+            cmd("mcedit .");
+            return;
+        }
+
+        std::vector<std::string> p = {"mcedit"};
+        for (size_t i = 1; i < args.size(); i++) p.push_back(args[i]);
+
+        cmdArgs(p);
+
+        cout << "\n";
+    };
+
+    commands["v"] = [&](const std::vector<std::string>& args) {
+        if (args.size() < 2) {
+            cmd("vim");
+            return;
+        }
+
+        std::vector<std::string> p = {"vim"};
+        for (size_t i = 1; i < args.size(); i++) p.push_back(args[i]);
+
+        cmdArgs(p);
+
+        cout << "\n";
     };
 }

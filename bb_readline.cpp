@@ -8,6 +8,27 @@
 #include <limits.h>
 #include <cstdlib>
 #include <iostream>
+#include <sys/stat.h>
+
+static std::string expandTilde(const std::string& p) {
+    if (p == "~") {
+        const char* h = getenv("HOME");
+        return (h && *h) ? std::string(h) : p;
+    }
+
+    if (p.size() >= 2 && p[0] == '~' && p[1] == '/') {
+        const char* h = getenv("HOME");
+        if (h && *h) return std::string(h) + p.substr(1);
+    }
+
+    return p;
+}
+
+static bool isDirPath(const std::string& p) {
+    struct stat st{};
+    if (stat(p.c_str(), &st) != 0) return false;
+    return S_ISDIR(st.st_mode);
+}
 
 struct TermRaw {
     termios old{};
@@ -119,21 +140,145 @@ static void printMatches(const std::vector<std::string>& m, const std::string& p
     redraw(prompt, buf, cur);
 }
 
+static int selectFromList(
+    const std::vector<std::string>& items,
+    int maxMenu = 8
+) {
+    if (items.empty()) return -1;
+
+    int total = (int)items.size();
+    int view = total > maxMenu ? maxMenu : total;
+    bool more = total > view;
+    int lines = view + (more ? 1 : 0);
+    int sel = 0;
+    int top = 0;
+    auto up = [&](int n) { if (n > 0) std::cout << "\033[" << n << "A"; };
+    auto down = [&](int n) { if (n > 0) std::cout << "\033[" << n << "B"; };
+    auto clearLine = [&]() { std::cout << "\r\033[2K"; };
+
+    auto clearMenu = [&]() {
+        up(lines);
+
+        for (int i = 0; i < lines; i++) {
+            clearLine();
+            if (i + 1 < lines) std::cout << "\n";
+        }
+
+        up(lines - 1);
+
+        std::cout << std::flush;
+    };
+
+    auto drawMenu = [&]() {
+        up(lines);
+
+        for (int i = 0; i < view; i++) {
+            int idx = top + i;
+
+            clearLine();
+
+            if (idx == sel) std::cout << "\033[7m";
+
+            std::cout << items[idx];
+
+            if (idx == sel) std::cout << "\033[0m";
+
+            std::cout << "\n";
+        }
+
+        if (more) {
+            clearLine();
+            int hidden = total - view;
+            std::cout << "... (+" << hidden << ")\n";
+        }
+
+        up(lines - 1);
+
+        std::cout << std::flush;
+    };
+
+    std::cout << "\n";
+
+    for (int i = 0; i < lines; i++) {
+        clearLine();
+        if (i + 1 < lines) std::cout << "\n";
+    }
+
+    up(lines - 1);
+
+    std::cout << std::flush;
+
+    drawMenu();
+
+    while (true) {
+        unsigned char c = 0;
+
+        if (!readByte(c)) continue;
+
+        if (c == '\n' || c == '\r') {
+            clearMenu();
+            return sel;
+        }
+
+        if (c == 3) {
+            clearMenu();
+            return -1;
+        }
+
+        if (c == 27) {
+            unsigned char a = 0, b = 0;
+
+            if (!readByte(a) || !readByte(b)) {
+                clearMenu();
+                return -1;
+            }
+
+            if (a == '[') {
+                if (b == 'A') {
+                    if (sel > 0) sel--;
+                    if (sel < top) top = sel;
+                    if (sel >= top + view) top = sel - (view - 1);
+
+                    drawMenu();
+
+                    continue;
+                }
+
+                if (b == 'B') {
+                    if (sel < total - 1) sel++;
+                    if (sel < top) top = sel;
+                    if (sel >= top + view) top = sel - (view - 1);
+
+                    drawMenu();
+
+                    continue;
+                }
+            }
+
+            clearMenu();
+
+            return -1;
+        }
+    }
+}
+
 std::string readLineNice(const std::string& prompt, const CommandMap& commands, std::vector<std::string>& history) {
     TermRaw tr;
-
     std::string buf;
-    size_t cur = 0;
-
-    long histPos = (long)history.size();
     std::string histSaved;
 
+    size_t cur = 0;
+    long histPos = (long)history.size();
+    bool tabPending = false;
+    
     std::cout << prompt << std::flush;
 
     while (true) {
         unsigned char c = 0;
 
         if (!readByte(c)) continue;
+
+        if (c != 9) tabPending = false;
 
         if (c == '\n' || c == '\r') {
             std::cout << "\n";
@@ -173,22 +318,35 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
 
             if (matches.empty()) {
                 std::cout << "\a" << std::flush;
+                tabPending = false;
                 continue;
             }
 
-            if (matches.size() == 1) {
-                std::string add = matches[0].substr(token.size());
+            if (matches.size() > 1) {
+                int idx = selectFromList(matches);
 
-                buf.insert(cur, add);
-                cur += add.size();
+                if (idx >= 0) {
+                    std::string m = matches[idx];
+                    std::string add = m.substr(token.size());
 
-                redraw(prompt, buf, cur);
+                    buf.insert(cur, add);
+                    cur += add.size();
+
+                    std::string real = expandTilde(m);
+
+                    if (isDirPath(real) && cur > 0 && buf[cur - 1] != '/') {
+                        buf.insert(cur, "/");
+                        cur++;
+                    }
+
+                    redraw(prompt, buf, cur);
+                }
 
                 continue;
             }
 
             std::string cp = commonPrefix(matches);
-            
+
             if (cp.size() > token.size()) {
                 std::string add = cp.substr(token.size());
 
@@ -196,8 +354,18 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                 cur += add.size();
 
                 redraw(prompt, buf, cur);
-            } else {
+
+                tabPending = false;
+
+                continue;
+            }
+
+            if (tabPending) {
                 printMatches(matches, prompt, buf, cur);
+                tabPending = false;
+            } else {
+                std::cout << "\a" << std::flush;
+                tabPending = true;
             }
 
             continue;
