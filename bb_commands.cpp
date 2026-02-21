@@ -328,6 +328,20 @@ void registerCommands(CommandMap& commands) {
         CLS();
     };
 
+    commands["update-biba"] = [&](const std::vector<std::string>&) {
+        cmd(
+            "rm -rf bitchbatch && "
+            "git clone https://github.com/Troyer05/bitchbatch.git && "
+            "cd bitchbatch && "
+            "sudo chmod +x install.sh && "
+            "sudo ./install.sh"
+        );
+
+        cout << "\nUpdate finished. Restarting...\n\n";
+
+        exit(0);
+    };
+
     commands["clear"] = [&](const std::vector<std::string>&) {
         CLS();
     };

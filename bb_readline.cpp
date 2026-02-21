@@ -186,10 +186,12 @@ static int selectFromList(const std::vector<std::string>& items, int maxMenu = 8
     };
 
     std::cout << "\n";
+
     for (int i = 0; i < lines; i++) {
         clearLine();
         if (i + 1 < lines) std::cout << "\n";
     }
+
     up(lines - 1);
     std::cout << std::flush;
 
@@ -221,7 +223,9 @@ static int selectFromList(const std::vector<std::string>& items, int maxMenu = 8
                     if (sel > 0) sel--;
                     if (sel < top) top = sel;
                     if (sel >= top + view) top = sel - (view - 1);
+
                     drawMenu();
+
                     continue;
                 }
 
@@ -229,7 +233,9 @@ static int selectFromList(const std::vector<std::string>& items, int maxMenu = 8
                     if (sel < total - 1) sel++;
                     if (sel < top) top = sel;
                     if (sel >= top + view) top = sel - (view - 1);
+
                     drawMenu();
+
                     continue;
                 }
             }
@@ -306,6 +312,7 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
 
             if (matches.size() > 1) {
                 int idx = selectFromList(matches);
+
                 if (idx >= 0) {
                     std::string m = matches[idx];
                     std::string add = m.substr(token.size());
@@ -322,6 +329,7 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
 
                     redraw(prompt, buf, cur);
                 }
+
                 continue;
             }
 
@@ -350,7 +358,6 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
             continue;
         }
 
-        // ESC SEQUENCES (Arrows/Home/End/Delete + History)
         if (c == 27) {
             unsigned char a = 0, b = 0;
 
@@ -359,9 +366,26 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
 
             // ESC [ ...
             if (a == '[') {
+
+                // HOME/END numeric: ESC [ 1~ / 4~ / 7~ / 8~
+                if (b == '1' || b == '4' || b == '7' || b == '8') {
+                    unsigned char t = 0;
+
+                    if (!readByte(t)) continue;
+
+                    if (t == '~') {
+                        if (b == '1' || b == '7') cur = 0;        // Home
+                        else cur = buf.size();                     // End
+                        redraw(prompt, buf, cur);
+                    }
+
+                    continue; // <- WICHTIG: Sequenz komplett konsumiert
+                }
+
                 // Delete: ESC [ 3 ~
                 if (b == '3') {
                     unsigned char t = 0;
+
                     if (!readByte(t)) continue;
 
                     if (t == '~') {
@@ -372,19 +396,7 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                             std::cout << "\a" << std::flush;
                         }
                     }
-                    continue;
-                }
 
-                // Home/End: ESC [ 1~/4~/7~/8~
-                if (b == '1' || b == '4' || b == '7' || b == '8') {
-                    unsigned char t = 0;
-                    if (!readByte(t)) continue;
-
-                    if (t == '~') {
-                        if (b == '1' || b == '7') cur = 0;
-                        else cur = buf.size();
-                        redraw(prompt, buf, cur);
-                    }
                     continue;
                 }
 
@@ -401,6 +413,7 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                     } else {
                         std::cout << "\a" << std::flush;
                     }
+
                     continue;
                 }
 
@@ -413,10 +426,12 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                         else buf = history[(size_t)histPos];
 
                         cur = buf.size();
+
                         redraw(prompt, buf, cur);
                     } else {
                         std::cout << "\a" << std::flush;
                     }
+
                     continue;
                 }
 
@@ -428,6 +443,7 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                     } else {
                         std::cout << "\a" << std::flush;
                     }
+
                     continue;
                 }
 
@@ -439,10 +455,28 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                     } else {
                         std::cout << "\a" << std::flush;
                     }
+
                     continue;
                 }
 
-                // Home/End: ESC [ H / F
+                // Home/End letter: ESC [ H / F
+                if (b == 'H') {
+                    cur = 0;
+                    redraw(prompt, buf, cur);
+                    continue;
+                }
+
+                if (b == 'F') {
+                    cur = buf.size();
+                    redraw(prompt, buf, cur);
+                    continue;
+                }
+
+                continue; // unbekannte ESC [ ... Sequenz
+            }
+
+            // ESC O H/F (xterm application mode)
+            if (a == 'O') {
                 if (b == 'H') {
                     cur = 0;
                     redraw(prompt, buf, cur);
@@ -456,20 +490,6 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                 }
 
                 continue;
-            }
-
-            // ESC O H/F (xterm application mode)
-            if (a == 'O') {
-                if (b == 'H') { // Home
-                    cur = 0;
-                    redraw(prompt, buf, cur);
-                    continue;
-                }
-                if (b == 'F') { // End
-                    cur = buf.size();
-                    redraw(prompt, buf, cur);
-                    continue;
-                }
             }
 
             continue;
@@ -505,8 +525,10 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                 if (cur > 0) {
                     buf.erase(0, cur);
                     cur = 0;
+
                     redraw(prompt, buf, cur);
                 }
+
                 continue;
             }
 
@@ -525,6 +547,7 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                 cur = i;
 
                 redraw(prompt, buf, cur);
+
                 continue;
             }
 
@@ -545,6 +568,7 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                 histSaved.clear();
 
                 std::cout << prompt << std::flush;
+
                 continue;
             }
 
@@ -556,6 +580,7 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                 } else {
                     std::cout << "\a" << std::flush;
                 }
+
                 continue;
             }
 
@@ -568,6 +593,7 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
             cur++;
 
             redraw(prompt, buf, cur);
+
             continue;
         }
     }
