@@ -333,20 +333,21 @@ void registerCommands(CommandMap& commands) {
     commands["update-biba"] = [&](const std::vector<std::string>&) {
         cmd(
             "set -e; "
-            "if [ -d bitchbatch/.git ]; then "
-            "  git -C bitchbatch pull --rebase; "
-            "else "
-            "  rm -rf bitchbatch; "
-            "  git clone https://github.com/Troyer05/bitchbatch.git; "
-            "fi; "
-            "cd bitchbatch; "
+            "tmpdir=$(mktemp -d); "
+            "trap 'rm -rf \"$tmpdir\"' EXIT; "
+            "git clone --depth 1 https://github.com/Troyer05/bitchbatch.git \"$tmpdir/bitchbatch\"; "
+            "cd \"$tmpdir/bitchbatch\"; "
             "chmod +x install.sh; "
             "sudo ./install.sh"
         );
 
-        cout << "\nUpdate finished. Please restart biba.\n\n";
-        
-        exit(0);
+        cout << "\nUpdate finished. Restarting...\n\n";
+
+        // Optional: direkt neu starten, wenn biba jetzt im PATH ist
+        char* argv[] = { (char*)"biba", nullptr };
+        execvp(argv[0], argv);
+        perror("execvp");
+        exit(1);
     };
 
     commands["clear"] = [&](const std::vector<std::string>&) {
