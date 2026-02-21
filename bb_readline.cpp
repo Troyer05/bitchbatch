@@ -64,7 +64,6 @@ static std::vector<std::string> completeCommands(const std::string& prefix, cons
     }
 
     std::sort(out.begin(), out.end());
-
     return out;
 }
 
@@ -93,7 +92,6 @@ static std::vector<std::string> completeFiles(const std::string& token) {
     }
 
     DIR* dp = opendir(realDir.c_str());
-
     if (!dp) return out;
 
     while (auto* de = readdir(dp)) {
@@ -111,9 +109,8 @@ static std::vector<std::string> completeFiles(const std::string& token) {
     }
 
     closedir(dp);
-    
-    std::sort(out.begin(), out.end());
 
+    std::sort(out.begin(), out.end());
     return out;
 }
 
@@ -121,13 +118,16 @@ static void redraw(const std::string& prompt, const std::string& buf, size_t cur
     std::cout << "\r\033[2K" << prompt << buf;
 
     size_t right = buf.size() - cur;
-    
     if (right > 0) std::cout << "\033[" << right << "D";
 
     std::cout << std::flush;
 }
 
-static void printMatches(const std::vector<std::string>& m, const std::string& prompt, const std::string& buf, size_t cur) {
+static void printMatches(const std::vector<std::string>& m,
+                         const std::string& prompt,
+                         const std::string& buf,
+                         size_t cur)
+{
     std::cout << "\n";
 
     for (size_t i = 0; i < m.size(); i++) {
@@ -136,14 +136,10 @@ static void printMatches(const std::vector<std::string>& m, const std::string& p
     }
 
     std::cout << "\n";
-    
     redraw(prompt, buf, cur);
 }
 
-static int selectFromList(
-    const std::vector<std::string>& items,
-    int maxMenu = 8
-) {
+static int selectFromList(const std::vector<std::string>& items, int maxMenu = 8) {
     if (items.empty()) return -1;
 
     int total = (int)items.size();
@@ -152,20 +148,17 @@ static int selectFromList(
     int lines = view + (more ? 1 : 0);
     int sel = 0;
     int top = 0;
+
     auto up = [&](int n) { if (n > 0) std::cout << "\033[" << n << "A"; };
-    auto down = [&](int n) { if (n > 0) std::cout << "\033[" << n << "B"; };
     auto clearLine = [&]() { std::cout << "\r\033[2K"; };
 
     auto clearMenu = [&]() {
         up(lines);
-
         for (int i = 0; i < lines; i++) {
             clearLine();
             if (i + 1 < lines) std::cout << "\n";
         }
-
         up(lines - 1);
-
         std::cout << std::flush;
     };
 
@@ -176,13 +169,9 @@ static int selectFromList(
             int idx = top + i;
 
             clearLine();
-
             if (idx == sel) std::cout << "\033[7m";
-
             std::cout << items[idx];
-
             if (idx == sel) std::cout << "\033[0m";
-
             std::cout << "\n";
         }
 
@@ -193,26 +182,21 @@ static int selectFromList(
         }
 
         up(lines - 1);
-
         std::cout << std::flush;
     };
 
     std::cout << "\n";
-
     for (int i = 0; i < lines; i++) {
         clearLine();
         if (i + 1 < lines) std::cout << "\n";
     }
-
     up(lines - 1);
-
     std::cout << std::flush;
 
     drawMenu();
 
     while (true) {
         unsigned char c = 0;
-
         if (!readByte(c)) continue;
 
         if (c == '\n' || c == '\r') {
@@ -220,43 +204,37 @@ static int selectFromList(
             return sel;
         }
 
-        if (c == 3) {
+        if (c == 3) { // Ctrl+C
             clearMenu();
             return -1;
         }
 
-        if (c == 27) {
+        if (c == 27) { // ESC
             unsigned char a = 0, b = 0;
-
             if (!readByte(a) || !readByte(b)) {
                 clearMenu();
                 return -1;
             }
 
             if (a == '[') {
-                if (b == 'A') {
+                if (b == 'A') { // up
                     if (sel > 0) sel--;
                     if (sel < top) top = sel;
                     if (sel >= top + view) top = sel - (view - 1);
-
                     drawMenu();
-
                     continue;
                 }
 
-                if (b == 'B') {
+                if (b == 'B') { // down
                     if (sel < total - 1) sel++;
                     if (sel < top) top = sel;
                     if (sel >= top + view) top = sel - (view - 1);
-
                     drawMenu();
-
                     continue;
                 }
             }
 
             clearMenu();
-
             return -1;
         }
     }
@@ -270,21 +248,22 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
     size_t cur = 0;
     long histPos = (long)history.size();
     bool tabPending = false;
-    
+
     std::cout << prompt << std::flush;
 
     while (true) {
         unsigned char c = 0;
-
         if (!readByte(c)) continue;
 
         if (c != 9) tabPending = false;
 
+        // ENTER
         if (c == '\n' || c == '\r') {
             std::cout << "\n";
             return buf;
         }
 
+        // BACKSPACE
         if (c == 127 || c == 8) {
             if (cur > 0) {
                 buf.erase(buf.begin() + (long)cur - 1);
@@ -293,10 +272,10 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
             } else {
                 std::cout << "\a" << std::flush;
             }
-
             continue;
         }
 
+        // TAB COMPLETION
         if (c == 9) {
             std::string left = buf.substr(0, cur);
             std::string token;
@@ -307,10 +286,13 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
             else token = left.substr(pos + 1);
 
             std::vector<std::string> matches;
-
             bool firstToken = (pos == std::string::npos);
 
-            if (firstToken && token.find('/') == std::string::npos && !startsWith(token, ".") && !startsWith(token, "~")) {
+            if (firstToken &&
+                token.find('/') == std::string::npos &&
+                !startsWith(token, ".") &&
+                !startsWith(token, "~"))
+            {
                 matches = completeCommands(token, commands);
             } else {
                 matches = completeFiles(token);
@@ -324,7 +306,6 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
 
             if (matches.size() > 1) {
                 int idx = selectFromList(matches);
-
                 if (idx >= 0) {
                     std::string m = matches[idx];
                     std::string add = m.substr(token.size());
@@ -341,7 +322,6 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
 
                     redraw(prompt, buf, cur);
                 }
-
                 continue;
             }
 
@@ -356,7 +336,6 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                 redraw(prompt, buf, cur);
 
                 tabPending = false;
-
                 continue;
             }
 
@@ -371,154 +350,167 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
             continue;
         }
 
+        // ESC SEQUENCES (Arrows/Home/End/Delete + History)
         if (c == 27) {
             unsigned char a = 0, b = 0;
 
             if (!readByte(a)) continue;
             if (!readByte(b)) continue;
 
+            // ESC [ ...
             if (a == '[') {
+                // Delete: ESC [ 3 ~
+                if (b == '3') {
+                    unsigned char t = 0;
+                    if (!readByte(t)) continue;
 
-            // Delete: ESC [ 3 ~
-            if (b == '3') {
-                unsigned char t = 0;
-                
-                if (!readByte(t)) continue;
+                    if (t == '~') {
+                        if (cur < buf.size()) {
+                            buf.erase(buf.begin() + (long)cur);
+                            redraw(prompt, buf, cur);
+                        } else {
+                            std::cout << "\a" << std::flush;
+                        }
+                    }
+                    continue;
+                }
 
-                if (t == '~') {
-                    if (cur < buf.size()) {
-                        buf.erase(buf.begin() + (long)cur);
+                // Home/End: ESC [ 1~/4~/7~/8~
+                if (b == '1' || b == '4' || b == '7' || b == '8') {
+                    unsigned char t = 0;
+                    if (!readByte(t)) continue;
+
+                    if (t == '~') {
+                        if (b == '1' || b == '7') cur = 0;
+                        else cur = buf.size();
+                        redraw(prompt, buf, cur);
+                    }
+                    continue;
+                }
+
+                // Arrow Up
+                if (b == 'A') {
+                    if (!history.empty() && histPos > 0) {
+                        if (histPos == (long)history.size()) histSaved = buf;
+
+                        histPos--;
+                        buf = history[(size_t)histPos];
+                        cur = buf.size();
+
                         redraw(prompt, buf, cur);
                     } else {
                         std::cout << "\a" << std::flush;
                     }
+                    continue;
                 }
 
-                continue;
-            }
+                // Arrow Down
+                if (b == 'B') {
+                    if (histPos < (long)history.size()) {
+                        histPos++;
 
-            // Home/End als ~ Varianten: ESC [ 1 ~ / 4 ~ / 7 ~ / 8 ~
-            if (b == '1' || b == '4' || b == '7' || b == '8') {
-                unsigned char t = 0;
+                        if (histPos == (long)history.size()) buf = histSaved;
+                        else buf = history[(size_t)histPos];
 
-                if (!readByte(t)) continue;
-
-                if (t == '~') {
-                    if (b == '1' || b == '7') {
-                        cur = 0;                 // Home
+                        cur = buf.size();
+                        redraw(prompt, buf, cur);
                     } else {
-                        cur = buf.size();        // End
+                        std::cout << "\a" << std::flush;
                     }
-                    redraw(prompt, buf, cur);
+                    continue;
                 }
 
-                continue;
-            }
+                // Arrow Right
+                if (b == 'C') {
+                    if (cur < buf.size()) {
+                        cur++;
+                        redraw(prompt, buf, cur);
+                    } else {
+                        std::cout << "\a" << std::flush;
+                    }
+                    continue;
+                }
 
-            // Pfeile: ESC [ A/B/C/D
-            if (b == 'A') {
-                if (!history.empty() && histPos > 0) {
-                    if (histPos == (long)history.size()) histSaved = buf;
+                // Arrow Left
+                if (b == 'D') {
+                    if (cur > 0) {
+                        cur--;
+                        redraw(prompt, buf, cur);
+                    } else {
+                        std::cout << "\a" << std::flush;
+                    }
+                    continue;
+                }
 
-                    histPos--;
-                    buf = history[(size_t)histPos];
+                // Home/End: ESC [ H / F
+                if (b == 'H') {
+                    cur = 0;
+                    redraw(prompt, buf, cur);
+                    continue;
+                }
+
+                if (b == 'F') {
                     cur = buf.size();
-
                     redraw(prompt, buf, cur);
-                } else {
-                    std::cout << "\a" << std::flush;
+                    continue;
                 }
 
                 continue;
             }
 
-            if (b == 'B') {
-                if (histPos < (long)history.size()) {
-                    histPos++;
-
-                    if (histPos == (long)history.size()) buf = histSaved;
-                    else buf = history[(size_t)histPos];
-
+            // ESC O H/F (xterm application mode)
+            if (a == 'O') {
+                if (b == 'H') { // Home
+                    cur = 0;
+                    redraw(prompt, buf, cur);
+                    continue;
+                }
+                if (b == 'F') { // End
                     cur = buf.size();
                     redraw(prompt, buf, cur);
-                } else {
-                    std::cout << "\a" << std::flush;
+                    continue;
                 }
-
-                continue;
             }
-
-            if (b == 'C') {
-                if (cur < buf.size()) {
-                    cur++;
-                    redraw(prompt, buf, cur);
-                } else {
-                    std::cout << "\a" << std::flush;
-                }
-
-                continue;
-            }
-
-            if (b == 'D') {
-                if (cur > 0) {
-                    cur--;
-                    redraw(prompt, buf, cur);
-                } else {
-                    std::cout << "\a" << std::flush;
-                }
-                
-                continue;
-            }
-
-            // Home/End als Buchstaben: ESC [ H / F
-            if (b == 'H') {
-                cur = 0;
-                redraw(prompt, buf, cur);
-                continue;
-            }
-
-            if (b == 'F') {
-                cur = buf.size();
-                redraw(prompt, buf, cur);
-                continue;
-            }
-        }
 
             continue;
         }
 
+        // CTRL SHORTCUTS
         if (c >= 1 && c <= 26) {
+            // Ctrl+A = Home
             if (c == 1) {
                 cur = 0;
                 redraw(prompt, buf, cur);
                 continue;
             }
 
+            // Ctrl+E = End
             if (c == 5) {
                 cur = buf.size();
                 redraw(prompt, buf, cur);
                 continue;
             }
 
+            // Ctrl+K = delete to end
             if (c == 11) {
                 if (cur < buf.size()) {
                     buf.erase(cur);
                     redraw(prompt, buf, cur);
                 }
-
                 continue;
             }
 
+            // Ctrl+U = delete to start
             if (c == 21) {
                 if (cur > 0) {
                     buf.erase(0, cur);
                     cur = 0;
                     redraw(prompt, buf, cur);
                 }
-
                 continue;
             }
 
+            // Ctrl+W = delete word
             if (c == 23) {
                 if (cur == 0) {
                     std::cout << "\a" << std::flush;
@@ -526,7 +518,6 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                 }
 
                 size_t i = cur;
-
                 while (i > 0 && buf[i - 1] == ' ') i--;
                 while (i > 0 && buf[i - 1] != ' ') i--;
 
@@ -534,16 +525,17 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                 cur = i;
 
                 redraw(prompt, buf, cur);
-
                 continue;
             }
 
+            // Ctrl+L = clear screen
             if (c == 12) {
                 std::cout << "\033[2J\033[H" << std::flush;
                 redraw(prompt, buf, cur);
                 continue;
             }
 
+            // Ctrl+C = cancel line
             if (c == 3) {
                 std::cout << "\n";
 
@@ -553,10 +545,10 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                 histSaved.clear();
 
                 std::cout << prompt << std::flush;
-
                 continue;
             }
 
+            // Ctrl+D = exit if empty
             if (c == 4) {
                 if (buf.empty()) {
                     std::cout << "\n";
@@ -564,19 +556,18 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                 } else {
                     std::cout << "\a" << std::flush;
                 }
-
                 continue;
             }
 
             continue;
         }
 
+        // PRINTABLE CHARACTERS
         if (c >= 32 && c <= 126) {
             buf.insert(buf.begin() + (long)cur, (char)c);
             cur++;
 
             redraw(prompt, buf, cur);
-
             continue;
         }
     }
