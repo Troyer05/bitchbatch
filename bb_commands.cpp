@@ -332,16 +332,20 @@ void registerCommands(CommandMap& commands) {
 
     commands["update-biba"] = [&](const std::vector<std::string>&) {
         cmd(
-            "sudo rm /sbin/biba"
-            "sudo rm -rf bitchbatch && "
-            "git clone https://github.com/Troyer05/bitchbatch.git && "
-            "cd bitchbatch && "
-            "sudo chmod +x install.sh && "
+            "set -e; "
+            "if [ -d bitchbatch/.git ]; then "
+            "  git -C bitchbatch pull --rebase; "
+            "else "
+            "  rm -rf bitchbatch; "
+            "  git clone https://github.com/Troyer05/bitchbatch.git; "
+            "fi; "
+            "cd bitchbatch; "
+            "chmod +x install.sh; "
             "sudo ./install.sh"
         );
 
-        cout << "\nUpdate finished. Restarting...\n\n";
-
+        cout << "\nUpdate finished. Please restart biba.\n\n";
+        
         exit(0);
     };
 
