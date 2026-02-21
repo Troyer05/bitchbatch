@@ -343,8 +343,8 @@ void registerCommands(CommandMap& commands) {
 
         cout << "\nUpdate finished. Restarting...\n\n";
 
-        // Optional: direkt neu starten, wenn biba jetzt im PATH ist
         char* argv[] = { (char*)"biba", nullptr };
+
         execvp(argv[0], argv);
         perror("execvp");
         exit(1);
