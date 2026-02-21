@@ -321,6 +321,8 @@ void registerCommands(CommandMap& commands) {
         cout << "grub        - Edits grub config and updates it\n";
         cout << "bash        - Creates and executes temporary bash script\n";
 
+        cout << "update-biba - Updates Bitch Batch\n";
+
         cout << "------------------------------------------------------------\n\n";
     };
 
