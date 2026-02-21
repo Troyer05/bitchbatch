@@ -378,90 +378,111 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
             if (!readByte(b)) continue;
 
             if (a == '[') {
-                 if (b == '3') {
-                    unsigned char t = 0;
-                    
-                    if (!readByte(t)) continue;
 
-                    if (t == '~') {
-                        if (cur < buf.size()) {
-                            buf.erase(buf.begin() + (long)cur);
-                            redraw(prompt, buf, cur);
-                        } else {
-                            std::cout << "\a" << std::flush;
-                        }
-                    }
+            // Delete: ESC [ 3 ~
+            if (b == '3') {
+                unsigned char t = 0;
+                
+                if (!readByte(t)) continue;
 
-                    continue;
-                }
-
-                if (b == 'A') {
-                    if (!history.empty() && histPos > 0) {
-                        if (histPos == (long)history.size()) histSaved = buf;
-
-                        histPos--;
-                        buf = history[(size_t)histPos];
-                        cur = buf.size();
-
-                        redraw(prompt, buf, cur);
-                    } else {
-                        std::cout << "\a" << std::flush;
-                    }
-
-                    continue;
-                }
-
-                if (b == 'B') {
-                    if (histPos < (long)history.size()) {
-                        histPos++;
-
-                        if (histPos == (long)history.size()) buf = histSaved;
-                        else buf = history[(size_t)histPos];
-
-                        cur = buf.size();
-
-                        redraw(prompt, buf, cur);
-                    } else {
-                        std::cout << "\a" << std::flush;
-                    }
-
-                    continue;
-                }
-
-                if (b == 'C') {
+                if (t == '~') {
                     if (cur < buf.size()) {
-                        cur++;
+                        buf.erase(buf.begin() + (long)cur);
                         redraw(prompt, buf, cur);
                     } else {
                         std::cout << "\a" << std::flush;
                     }
-
-                    continue;
                 }
 
-                if (b == 'D') {
-                    if (cur > 0) {
-                        cur--;
-                        redraw(prompt, buf, cur);
+                continue;
+            }
+
+            // Home/End als ~ Varianten: ESC [ 1 ~ / 4 ~ / 7 ~ / 8 ~
+            if (b == '1' || b == '4' || b == '7' || b == '8') {
+                unsigned char t = 0;
+
+                if (!readByte(t)) continue;
+
+                if (t == '~') {
+                    if (b == '1' || b == '7') {
+                        cur = 0;                 // Home
                     } else {
-                        std::cout << "\a" << std::flush;
+                        cur = buf.size();        // End
                     }
-
-                    continue;
-                }
-
-                if (b == 'H') {
-                    cur = 0;
                     redraw(prompt, buf, cur);
-                    continue;
                 }
 
-                if (b == 'F') {
+                continue;
+            }
+
+            // Pfeile: ESC [ A/B/C/D
+            if (b == 'A') {
+                if (!history.empty() && histPos > 0) {
+                    if (histPos == (long)history.size()) histSaved = buf;
+
+                    histPos--;
+                    buf = history[(size_t)histPos];
+                    cur = buf.size();
+
+                    redraw(prompt, buf, cur);
+                } else {
+                    std::cout << "\a" << std::flush;
+                }
+
+                continue;
+            }
+
+            if (b == 'B') {
+                if (histPos < (long)history.size()) {
+                    histPos++;
+
+                    if (histPos == (long)history.size()) buf = histSaved;
+                    else buf = history[(size_t)histPos];
+
                     cur = buf.size();
                     redraw(prompt, buf, cur);
-                    continue;
+                } else {
+                    std::cout << "\a" << std::flush;
                 }
+
+                continue;
             }
+
+            if (b == 'C') {
+                if (cur < buf.size()) {
+                    cur++;
+                    redraw(prompt, buf, cur);
+                } else {
+                    std::cout << "\a" << std::flush;
+                }
+
+                continue;
+            }
+
+            if (b == 'D') {
+                if (cur > 0) {
+                    cur--;
+                    redraw(prompt, buf, cur);
+                } else {
+                    std::cout << "\a" << std::flush;
+                }
+                
+                continue;
+            }
+
+            // Home/End als Buchstaben: ESC [ H / F
+            if (b == 'H') {
+                cur = 0;
+                redraw(prompt, buf, cur);
+                continue;
+            }
+
+            if (b == 'F') {
+                cur = buf.size();
+                redraw(prompt, buf, cur);
+                continue;
+            }
+        }
 
             continue;
         }
