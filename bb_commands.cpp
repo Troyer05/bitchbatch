@@ -280,7 +280,7 @@ static void pkgUninstall(PkgMgr m, const std::vector<std::string>& pkgs) {
 void registerCommands(CommandMap& commands) {
     static const PkgMgr PM = detectPkgMgr();
     // optional zum Debuggen:
-    cout << "[pkg] detected: " << mgrName(PM) << "\n";
+    // cout << "[pkg] detected: " << mgrName(PM) << "\n";
 
     commands["help"] = [&](const std::vector<std::string>&) {
         cout << "\nAvailable Commands:\n";
