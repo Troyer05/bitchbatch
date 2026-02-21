@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 
 static std::string expandTilde(const std::string& p) {
     if (p == "~") {
@@ -111,16 +112,82 @@ static std::vector<std::string> completeFiles(const std::string& token) {
     closedir(dp);
 
     std::sort(out.begin(), out.end());
+
     return out;
 }
 
-static void redraw(const std::string& prompt, const std::string& buf, size_t cur) {
-    std::cout << "\r\033[2K" << prompt << buf;
+static int visibleLenAnsi(const std::string& s) {
+    int n = 0;
 
-    size_t right = buf.size() - cur;
-    if (right > 0) std::cout << "\033[" << right << "D";
+    for (size_t i = 0; i < s.size(); ) {
+        unsigned char c = (unsigned char)s[i];
+
+        if (c == 0x1B && i + 1 < s.size() && s[i + 1] == '[') {
+            i += 2;
+
+            while (i < s.size()) {
+                unsigned char x = (unsigned char)s[i++];
+
+                if (x >= 0x40 && x <= 0x7E) break;
+            }
+
+            continue;
+        }
+
+        n++;
+        i++;
+    }
+
+    return n;
+}
+
+static int termCols() {
+    winsize ws{};
+
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0)
+        return (int)ws.ws_col;
+
+    return 80;
+}
+
+static void redraw(const std::string& prompt, const std::string& buf, size_t cur) {
+    static int lastLines = 1;
+
+    int cols = termCols();
+    int plen = visibleLenAnsi(prompt);
+    int total = plen + (int)buf.size();
+    int cursorPos = plen + (int)cur;
+    int lines = (total / cols) + 1;
+    int curLine = (cursorPos / cols);
+    int curCol  = (cursorPos % cols);
+
+    std::cout << "\r";
+
+    if (lastLines > 1) std::cout << "\033[" << (lastLines - 1) << "A";
+
+    for (int i = 0; i < lastLines; i++) {
+        std::cout << "\033[2K";
+        if (i + 1 < lastLines) std::cout << "\n";
+    }
+
+    if (lastLines > 1) std::cout << "\033[" << (lastLines - 1) << "A";
+
+    std::cout << "\r" << prompt << buf;
+
+    int endPos = plen + (int)buf.size();
+    int endLine = endPos / cols;
+    int endCol  = endPos % cols;
+    int up = endLine - curLine;
+
+    if (up > 0) std::cout << "\033[" << up << "A";
+
+    std::cout << "\r";
+    
+    if (curCol > 0) std::cout << "\033[" << curCol << "C";
 
     std::cout << std::flush;
+
+    lastLines = lines;
 }
 
 static void printMatches(const std::vector<std::string>& m,

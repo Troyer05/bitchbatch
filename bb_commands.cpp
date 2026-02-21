@@ -2,6 +2,7 @@
 #include "bb_commands.h"
 #include "bb_exec.h"
 #include "bb_search.h"
+#include "bb_signal.h"
 
 #include <unistd.h>
 #include <cerrno>
@@ -11,6 +12,7 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
+#include <csignal>
 
 using namespace std;
 
@@ -278,6 +280,8 @@ static void pkgUninstall(PkgMgr m, const std::vector<std::string>& pkgs) {
 }
 
 void registerCommands(CommandMap& commands) {
+    std::signal(SIGINT, onSigInt);
+
     static const PkgMgr PM = detectPkgMgr();
     // optional zum Debuggen:
     // cout << "[pkg] detected: " << mgrName(PM) << "\n";
@@ -606,16 +610,17 @@ void registerCommands(CommandMap& commands) {
     };
 
     commands["search"] = [&](const std::vector<std::string>& args) {
-        if (args.size() < 2) {
-            std::cout << "usage: search <pattern>\n\n";
-            return;
+        if (args.size() < 2) { cout << "usage: search <pattern>\n\n"; return; }
+
+        auto cwd = std::filesystem::current_path().string();
+
+        if (cwd == "/") {
+            cout << "Hint: Searching / will skip /proc,/sys,/dev,/run to avoid crashes.\n\n";
         }
 
-        namespace fs = std::filesystem;
-        
-        searchRecursive(fs::current_path().string(), args[1]);
+        searchRecursive(cwd, args[1]);
 
-        std::cout << "\n";
+        cout << "\n";
     };
 
     commands["cl"] = [&](const std::vector<std::string>& args) {
