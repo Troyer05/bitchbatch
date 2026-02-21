@@ -8,10 +8,280 @@
 #include <cstring>
 #include <iostream>
 #include <filesystem>
+#include <cstdlib>
+#include <string>
+#include <vector>
 
 using namespace std;
 
+enum class PkgMgr {
+    APT,
+    DNF,
+    YUM,
+    PACMAN,
+    ZYPPER,
+    APK,
+    XBPS,
+    PKG,      // FreeBSD
+    UNKNOWN
+};
+
+static bool binExists(const std::string& bin) {
+    // "command -v" ist POSIX, läuft auf Linux/macOS/BSD
+    std::string s = "command -v " + bin + " >/dev/null 2>&1";
+    return (std::system(s.c_str()) == 0);
+}
+
+static PkgMgr detectPkgMgr() {
+    // Priorität so wählen, dass "modernere" zuerst greifen
+    if (binExists("apt-get") || binExists("apt")) return PkgMgr::APT;
+    if (binExists("dnf")) return PkgMgr::DNF;
+    if (binExists("yum")) return PkgMgr::YUM;
+    if (binExists("pacman")) return PkgMgr::PACMAN;
+    if (binExists("zypper")) return PkgMgr::ZYPPER;
+    if (binExists("apk")) return PkgMgr::APK;
+    if (binExists("xbps-install")) return PkgMgr::XBPS;
+    if (binExists("pkg")) return PkgMgr::PKG;
+
+    return PkgMgr::UNKNOWN;
+}
+
+static std::string mgrName(PkgMgr m) {
+    switch (m) {
+        case PkgMgr::APT: return "apt";
+        case PkgMgr::DNF: return "dnf";
+        case PkgMgr::YUM: return "yum";
+        case PkgMgr::PACMAN: return "pacman";
+        case PkgMgr::ZYPPER: return "zypper";
+        case PkgMgr::APK: return "apk";
+        case PkgMgr::XBPS: return "xbps";
+        case PkgMgr::PKG: return "pkg";
+        default: return "unknown";
+    }
+}
+
+static void pkgUpdate(PkgMgr m) {
+    switch (m) {
+        case PkgMgr::APT:
+            cmd("sudo apt update");
+            break;
+        case PkgMgr::DNF:
+            cmd("sudo dnf -y makecache");
+            break;
+        case PkgMgr::YUM:
+            cmd("sudo yum -y makecache");
+            break;
+        case PkgMgr::PACMAN:
+            cmd("sudo pacman -Sy --noconfirm");
+            break;
+        case PkgMgr::ZYPPER:
+            cmd("sudo zypper --non-interactive refresh");
+            break;
+        case PkgMgr::APK:
+            cmd("sudo apk update");
+            break;
+        case PkgMgr::XBPS:
+            cmd("sudo xbps-install -Suy");
+            break;
+        case PkgMgr::PKG:
+            cmd("sudo pkg update -f");
+            break;
+        default:
+            std::cout << "No supported package manager found.\n";
+            break;
+    }
+}
+
+static void pkgUpgrade(PkgMgr m) {
+    switch (m) {
+        case PkgMgr::APT:
+            cmd("sudo apt upgrade -y");
+            break;
+        case PkgMgr::DNF:
+            cmd("sudo dnf -y upgrade");
+            break;
+        case PkgMgr::YUM:
+            cmd("sudo yum -y update");
+            break;
+        case PkgMgr::PACMAN:
+            cmd("sudo pacman -Syu --noconfirm");
+            break;
+        case PkgMgr::ZYPPER:
+            cmd("sudo zypper --non-interactive update");
+            break;
+        case PkgMgr::APK:
+            cmd("sudo apk upgrade");
+            break;
+        case PkgMgr::XBPS:
+            // xbps macht update+upgrade zusammen in pkgUpdate() bereits,
+            // aber wir lassen es hier trotzdem sauber:
+            cmd("sudo xbps-install -Suy");
+            break;
+        case PkgMgr::PKG:
+            cmd("sudo pkg upgrade -y");
+            break;
+        default:
+            std::cout << "No supported package manager found.\n";
+            break;
+    }
+}
+
+static void pkgAutoremove(PkgMgr m) {
+    switch (m) {
+        case PkgMgr::APT:
+            cmd("sudo apt autoremove -y");
+            break;
+        case PkgMgr::DNF:
+            cmd("sudo dnf -y autoremove");
+            break;
+        case PkgMgr::YUM:
+            cmd("sudo yum -y autoremove");
+            break;
+        case PkgMgr::PACMAN:
+            // Entfernt verwaiste Pakete
+            cmd("bash -lc 'sudo pacman -Qtdq >/dev/null 2>&1 && sudo pacman -Rns --noconfirm $(pacman -Qtdq) || true'");
+            break;
+        case PkgMgr::ZYPPER:
+            cmd("sudo zypper --non-interactive packages --orphaned"); // nur anzeigen
+            break;
+        case PkgMgr::APK:
+            // kein direktes autoremove
+            break;
+        case PkgMgr::XBPS:
+            cmd("sudo xbps-remove -o");
+            break;
+        case PkgMgr::PKG:
+            cmd("sudo pkg autoremove -y");
+            break;
+        default:
+            break;
+    }
+}
+
+static void pkgInstall(PkgMgr m, const std::vector<std::string>& pkgs) {
+    if (pkgs.empty()) return;
+
+    switch (m) {
+        case PkgMgr::APT: {
+            std::string s = "sudo apt install -y";
+            for (auto& p : pkgs) s += " " + p;
+            cmd(s);
+            break;
+        }
+        case PkgMgr::DNF: {
+            std::string s = "sudo dnf -y install";
+            for (auto& p : pkgs) s += " " + p;
+            cmd(s);
+            break;
+        }
+        case PkgMgr::YUM: {
+            std::string s = "sudo yum -y install";
+            for (auto& p : pkgs) s += " " + p;
+            cmd(s);
+            break;
+        }
+        case PkgMgr::PACMAN: {
+            std::string s = "sudo pacman -S --noconfirm";
+            for (auto& p : pkgs) s += " " + p;
+            cmd(s);
+            break;
+        }
+        case PkgMgr::ZYPPER: {
+            std::string s = "sudo zypper --non-interactive install";
+            for (auto& p : pkgs) s += " " + p;
+            cmd(s);
+            break;
+        }
+        case PkgMgr::APK: {
+            std::string s = "sudo apk add";
+            for (auto& p : pkgs) s += " " + p;
+            cmd(s);
+            break;
+        }
+        case PkgMgr::XBPS: {
+            std::string s = "sudo xbps-install -y";
+            for (auto& p : pkgs) s += " " + p;
+            cmd(s);
+            break;
+        }
+        case PkgMgr::PKG: {
+            std::string s = "sudo pkg install -y";
+            for (auto& p : pkgs) s += " " + p;
+            cmd(s);
+            break;
+        }
+        default:
+            std::cout << "No supported package manager found.\n";
+            break;
+    }
+}
+
+static void pkgUninstall(PkgMgr m, const std::vector<std::string>& pkgs) {
+    if (pkgs.empty()) return;
+
+    switch (m) {
+        case PkgMgr::APT: {
+            std::string s = "sudo apt purge -y";
+            for (auto& p : pkgs) s += " " + p;
+            cmd(s);
+            cmd("sudo apt autoremove -y");
+            break;
+        }
+        case PkgMgr::DNF: {
+            std::string s = "sudo dnf -y remove";
+            for (auto& p : pkgs) s += " " + p;
+            cmd(s);
+            cmd("sudo dnf -y autoremove");
+            break;
+        }
+        case PkgMgr::YUM: {
+            std::string s = "sudo yum -y remove";
+            for (auto& p : pkgs) s += " " + p;
+            cmd(s);
+            break;
+        }
+        case PkgMgr::PACMAN: {
+            std::string s = "sudo pacman -Rns --noconfirm";
+            for (auto& p : pkgs) s += " " + p;
+            cmd(s);
+            break;
+        }
+        case PkgMgr::ZYPPER: {
+            std::string s = "sudo zypper --non-interactive remove";
+            for (auto& p : pkgs) s += " " + p;
+            cmd(s);
+            break;
+        }
+        case PkgMgr::APK: {
+            std::string s = "sudo apk del";
+            for (auto& p : pkgs) s += " " + p;
+            cmd(s);
+            break;
+        }
+        case PkgMgr::XBPS: {
+            std::string s = "sudo xbps-remove -Ry";
+            for (auto& p : pkgs) s += " " + p;
+            cmd(s);
+            break;
+        }
+        case PkgMgr::PKG: {
+            std::string s = "sudo pkg delete -y";
+            for (auto& p : pkgs) s += " " + p;
+            cmd(s);
+            cmd("sudo pkg autoremove -y");
+            break;
+        }
+        default:
+            std::cout << "No supported package manager found.\n";
+            break;
+    }
+}
+
 void registerCommands(CommandMap& commands) {
+    static const PkgMgr PM = detectPkgMgr();
+    // optional zum Debuggen:
+    cout << "[pkg] detected: " << mgrName(PM) << "\n";
+
     commands["help"] = [&](const std::vector<std::string>&) {
         cout << "\nAvailable Commands:\n";
         cout << "------------------------------------------------------------\n";
@@ -88,9 +358,9 @@ void registerCommands(CommandMap& commands) {
     };
 
     commands["update"] = [&](const std::vector<std::string>&) {
-        cmd("sudo apt update");
-        cmd("sudo apt upgrade -y");
-        cmd("sudo apt autoremove -y");
+        pkgUpdate(PM);
+        pkgUpgrade(PM);
+        pkgAutoremove(PM);
 
         cout << "\n";
     };
@@ -131,23 +401,16 @@ void registerCommands(CommandMap& commands) {
     };
 
     commands["init"] = [&](const std::vector<std::string>&) {
-        cmd("sudo apt update");
-        cmd("sudo apt install -y curl");
-        cmd("sudo apt install -y wget");
-        cmd("sudo apt install -y git");
-        cmd("sudo apt install -y htop");
-        cmd("sudo apt install -y btop");
-        cmd("sudo apt install -y iptraf");
-        cmd("sudo apt install -y atop");
-        cmd("sudo apt install -y iotop");
-        cmd("sudo apt install -y glances");
-        cmd("sudo apt install -y iperf");
-        cmd("sudo apt install -y gcc");
-        cmd("sudo apt install -y lolcat");
-        cmd("sudo apt install -y nano");
-        cmd("sudo apt install -y vim");
-        cmd("sudo apt install -y ranger");
-        cmd("sudo apt install -y mc");
+        pkgUpdate(PM);
+
+        std::vector<std::string> pkgs = {
+            "curl","wget","git","htop","btop","iptraf","atop","iotop","glances","iperf",
+            "gcc","lolcat","nano","vim","ranger","mc"
+        };
+
+        pkgInstall(PM, pkgs);
+        pkgUpgrade(PM);
+        pkgAutoremove(PM);
 
         cout << "\n";
     };
@@ -264,16 +527,14 @@ void registerCommands(CommandMap& commands) {
         cout << "\n";
     };
 
+
     commands["install"] = [&](const std::vector<std::string>& args) {
-        if (args.size() < 2) {
-            cout << "usage: install <apt-program>\n\n";
-            return;
-        }
+        if (args.size() < 2) { cout << "usage: install <package...>\n\n"; return; }
 
-        std::vector<std::string> p = {"sudo", "apt", "install", "-y"};
-        for (size_t i = 1; i < args.size(); i++) p.push_back(args[i]);
+        std::vector<std::string> pkgs(args.begin() + 1, args.end());
 
-        cmdArgs(p);
+        pkgInstall(PM, pkgs);
+        
         cout << "\n";
     };
 
@@ -292,16 +553,14 @@ void registerCommands(CommandMap& commands) {
 
     commands["uninstall"] = [&](const std::vector<std::string>& args) {
         if (args.size() < 2) {
-            cout << "usage: uninstall <apt-program>\n\n";
+            cout << "usage: uninstall <package...>\n\n";
             return;
         }
 
-        std::vector<std::string> p = {"sudo", "apt", "purge", "-y"};
-        for (size_t i = 1; i < args.size(); i++) p.push_back(args[i]);
-
-        cmdArgs(p);
-        cmd("sudo apt autoremove -y");
-
+        std::vector<std::string> pkgs(args.begin() + 1, args.end());
+        
+        pkgUninstall(PM, pkgs);
+        
         cout << "\n";
     };
 
