@@ -316,7 +316,7 @@ void registerCommands(CommandMap& commands) {
 
         cout << "search <p>  - Recursively searches for pattern\n";
         cout << "grub        - Edits grub config and updates it\n";
-        cout << "bash        - Creates and executes temporary bash script\n";
+        cout << "bash <o:f>  - Creates and executes temporary bash script or with parameter <file.sh> executes .sh file\n";
         cout << "off         - Shuts off computer\n";
         cout << "ch          - Clears history\n";
         cout << "history     - Prints history";
@@ -364,15 +364,6 @@ void registerCommands(CommandMap& commands) {
     commands["grub"] = [&](const std::vector<std::string>&) {
         cmd("sudo nano /etc/default/grub");
         cmd("sudo update-grub");
-
-        cout << "\n";
-    };
-
-    commands["bash"] = [&](const std::vector<std::string>&) {
-        cmd("sudo nano bitchtmp.sh");
-        cmd("sudo chmod +x bitchtmp.sh");
-        cmd("sudo bash bitchtmp.sh");
-        cmd("sudo rm bitchtmp.sh");
 
         cout << "\n";
     };
@@ -613,6 +604,29 @@ void registerCommands(CommandMap& commands) {
         std::vector<std::string> pkgs(args.begin() + 1, args.end());
 
         pkgInstall(PM, pkgs);
+        
+        cout << "\n";
+    };
+
+    commands["bash"] = [&](const std::vector<std::string>& args) {
+        if (args.size() < 2) {
+            cmd("sudo nano bitchtmp.sh");
+            cmd("sudo chmod +x bitchtmp.sh");
+            cmd("sudo bash bitchtmp.sh");
+            cmd("sudo rm bitchtmp.sh");
+            
+            cout << "\n";
+
+            return;   // ← WICHTIG
+        }
+
+        std::vector<std::string> p = {"sudo", "bash"};
+        
+        for (size_t i = 1; i < args.size(); i++) {
+            p.push_back(args[i]);
+        }
+
+        cmdArgs(p);
         
         cout << "\n";
     };
