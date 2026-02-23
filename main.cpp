@@ -10,6 +10,7 @@
 #include "bb_util.h"
 #include "bb_exec.h"
 #include "bb_commands.h"
+#include "history.h"
 
 using namespace std;
 
@@ -24,6 +25,12 @@ int main() {
     signal(SIGINT, onSigInt);
     signal(SIGQUIT, SIG_IGN);
 
+    // Load persistent history (shared with readLineNice)
+    std::vector<std::string> hist;
+
+    historyInit(500);
+    loadHistory(hist, 500);
+
     CLS();
 
     cmd("figlet BITCHBATCH");
@@ -33,11 +40,11 @@ int main() {
         return 0;
     }
 
-    cout << Color::YELLOW << "If you run this the first time, please type   init    and hit enter. Then restart Bitch Batch\n\n" << Color::RESET;
+    cout << Color::YELLOW
+         << "If you run this the first time, please type   init    and hit enter. Then restart Bitch Batch\n\n"
+         << Color::RESET;
 
     CommandMap commands;
-    std::vector<std::string> history;
-
     registerCommands(commands);
 
     while (true) {
@@ -51,28 +58,33 @@ int main() {
             Color::RED + host +
             Color::CYAN + " : " +
             Color::CYAN + cwd +
-            Color::RESET + "\n" + 
+            Color::RESET + "\n" +
             Color::YELLOW + "> " +
             Color::RESET;
 
-        string line = readLineNice(prompt, commands, history);
+        std::string line = readLineNice(prompt, commands, historyVec());
+
+        // Save external commands too
+        appendHistory(historyVec(), line, 500);
 
         if (line.empty()) continue;
-        if (history.empty() || history.back() != line) history.push_back(line);
 
+        // Parse tokens for builtin commands
         auto parts = splitSimple(line);
-
         if (parts.empty()) continue;
 
         auto it = commands.find(parts[0]);
 
         if (it != commands.end()) {
             it->second(parts);
+
+            // Save history AFTER a successful command dispatch (optional but nice)
+            appendHistory(hist, line, 500);
             continue;
         }
-        
+
         cout << "\n";
-        
+
         cmd(line);
 
         cout << "\n\n";

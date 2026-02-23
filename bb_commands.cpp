@@ -3,6 +3,7 @@
 #include "bb_exec.h"
 #include "bb_search.h"
 #include "bb_signal.h"
+#include "history.h"
 
 #include <unistd.h>
 #include <cerrno>
@@ -317,6 +318,8 @@ void registerCommands(CommandMap& commands) {
         cout << "grub        - Edits grub config and updates it\n";
         cout << "bash        - Creates and executes temporary bash script\n";
         cout << "off         - Shuts off computer\n";
+        cout << "ch          - Clears history\n";
+        cout << "history     - Prints history";
 
         cout << "update-biba - Updates Bitch Batch\n";
 
@@ -427,6 +430,12 @@ void registerCommands(CommandMap& commands) {
         exit(0);
     };
 
+    commands["ch"] = [&](const std::vector<std::string>&) {
+        clearHistory(historyVec());
+
+        cout << "History cleared.\n\n";
+    };
+
     commands["off"] = [&](const std::vector<std::string>&) {
         cmd("poweroff");
 
@@ -446,6 +455,43 @@ void registerCommands(CommandMap& commands) {
         pkgInstall(PM, pkgs);
         pkgUpgrade(PM);
         pkgAutoremove(PM);
+
+        cout << "\n";
+    };
+
+    commands["history"] = [&](const std::vector<std::string>& args) {
+        auto& hist = historyVec();
+
+        if (args.size() == 2 && args[1] == "-c") {
+            clearHistory(hist);
+            
+            cout << "History cleared.\n\n";
+
+            return;
+        }
+
+        if (hist.empty()) {
+            cout << "History is empty.\n\n";
+            return;
+        }
+
+        size_t start = 0;
+
+        // Optional: history 20  -> letzte 20 anzeigen
+        if (args.size() == 2) {
+            try {
+                size_t n = std::stoul(args[1]);
+            
+                if (n < hist.size())
+                    start = hist.size() - n;
+            } catch (...) {
+                // ignore invalid number
+            }
+        }
+
+        for (size_t i = start; i < hist.size(); ++i) {
+            cout << i + 1 << "  " << hist[i] << "\n";
+        }
 
         cout << "\n";
     };

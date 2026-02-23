@@ -1,5 +1,6 @@
 #include "bb_readline.h"
 #include "bb_util.h"
+#include "history.h"
 
 #include <unistd.h>
 #include <termios.h>
@@ -354,7 +355,7 @@ static int selectFromList(const std::vector<std::string>& items, int maxMenu = 8
 }
 
 
-std::string readLineNice(const std::string& prompt, const CommandMap& commands, std::vector<std::string>& history) {
+std::string readLineNice(const std::string& prompt, const CommandMap& commands, std::vector<std::string>& hist) {
     TermRaw tr;
 
     std::string buf;
@@ -362,7 +363,7 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
 
     size_t cur = 0;
 
-    long histPos = (long)history.size();
+    long histPos = (long)hist.size();
     bool tabPending = false;
 
     redraw(prompt, buf, cur);
@@ -518,12 +519,12 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                     continue;
                 }
 
-                if (b == 'A') {
-                    if (!history.empty() && histPos > 0) {
-                        if (histPos == (long)history.size()) histSaved = buf;
+                if (b == 'A') { // UP
+                    if (!hist.empty() && histPos > 0) {
+                        if (histPos == (long)hist.size()) histSaved = buf;
 
                         histPos--;
-                        buf = history[(size_t)histPos];
+                        buf = hist[(size_t)histPos];
                         cur = buf.size();
 
                         redraw(prompt, buf, cur);
@@ -534,12 +535,12 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                     continue;
                 }
 
-                if (b == 'B') {
-                    if (histPos < (long)history.size()) {
+                if (b == 'B') { // DOWN
+                    if (histPos < (long)hist.size()) {
                         histPos++;
 
-                        if (histPos == (long)history.size()) buf = histSaved;
-                        else buf = history[(size_t)histPos];
+                        if (histPos == (long)hist.size()) buf = histSaved;
+                        else buf = hist[(size_t)histPos];
 
                         cur = buf.size();
 
@@ -606,19 +607,19 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
         }
 
         if (c >= 1 && c <= 26) {
-            if (c == 1) {
+            if (c == 1) { // Ctrl+A
                 cur = 0;
                 redraw(prompt, buf, cur);
                 continue;
             }
 
-            if (c == 5) {
+            if (c == 5) { // Ctrl+E
                 cur = buf.size();
                 redraw(prompt, buf, cur);
                 continue;
             }
 
-            if (c == 11) {
+            if (c == 11) { // Ctrl+K
                 if (cur < buf.size()) {
                     buf.erase(cur);
                     redraw(prompt, buf, cur);
@@ -627,7 +628,7 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                 continue;
             }
 
-            if (c == 21) {
+            if (c == 21) { // Ctrl+U
                 if (cur > 0) {
                     buf.erase(0, cur);
                     cur = 0;
@@ -638,7 +639,7 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                 continue;
             }
 
-            if (c == 23) {
+            if (c == 23) { // Ctrl+W
                 if (cur == 0) {
                     std::cout << "\a" << std::flush;
                     continue;
@@ -657,18 +658,18 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                 continue;
             }
 
-            if (c == 12) {
+            if (c == 12) { // Ctrl+L
                 std::cout << "\033[2J\033[H" << std::flush;
                 redraw(prompt, buf, cur);
                 continue;
             }
 
-            if (c == 3) {
+            if (c == 3) { // Ctrl+C
                 std::cout << "\n";
 
                 buf.clear();
                 cur = 0;
-                histPos = (long)history.size();
+                histPos = (long)hist.size();
                 histSaved.clear();
 
                 redraw(prompt, buf, cur);
@@ -676,7 +677,7 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                 continue;
             }
 
-            if (c == 4) {
+            if (c == 4) { // Ctrl+D
                 if (buf.empty()) {
                     std::cout << "\n";
                     exit(0);
@@ -695,7 +696,6 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
             cur++;
 
             redraw(prompt, buf, cur);
-            
             continue;
         }
     }
