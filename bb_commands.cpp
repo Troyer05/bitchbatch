@@ -333,6 +333,8 @@ void registerCommands(CommandMap& commands) {
         cmd("git clone https://github.com/Troyer05/bitchbatch.git");
         cmd("sudo chmod +x bitchbatch/install.sh");
         cmd("sudo bash bitchbatch/install.sh");
+        cmd("sudo cp bitchbatch/biba /usr/local/bin/biba");
+        cmd("sudo cp bitchbatch/biba /usr/sbin/biba");
 
         cout << "\nUpdate finished. Restarting...\n\n";
 
