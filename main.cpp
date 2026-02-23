@@ -70,10 +70,12 @@ int main() {
             it->second(parts);
             continue;
         }
-
+        
+        cout << "\n";
+        
         cmd(line);
 
-        cout << "\n";
+        cout << "\n\n";
     }
 
     return 0;

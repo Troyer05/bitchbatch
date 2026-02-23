@@ -328,7 +328,7 @@ void registerCommands(CommandMap& commands) {
 
     commands["update-biba"] = [&](const std::vector<std::string>&) {
         cmd("sudo rm -r bitchbatch");
-        cmd("sudo rm -r /sbin/biba");
+        cmd("sudo rm /sbin/biba");
         cmd("git clone https://github.com/Troyer05/bitchbatch.git");
         cmd("sudo chmod +x bitchbatch/install.sh");
         cmd("sudo bash bitchbatch/install.sh");
@@ -414,6 +414,14 @@ void registerCommands(CommandMap& commands) {
         exit(0);
     };
 
+    commands["off"] = [&](const std::vector<std::string>&) {
+        cmd("poweroff");
+
+        cout << "\n";
+        
+        exit(0);
+    };
+
     commands["init"] = [&](const std::vector<std::string>&) {
         pkgUpdate(PM);
 
@@ -428,7 +436,6 @@ void registerCommands(CommandMap& commands) {
 
         cout << "\n";
     };
-
 
     commands["mk"] = [&](const std::vector<std::string>& args) {
         if (args.size() < 2) {
