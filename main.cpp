@@ -51,7 +51,8 @@ int main() {
             Color::RED + host +
             Color::CYAN + " : " +
             Color::CYAN + cwd +
-            Color::YELLOW + " > " +
+            Color::RESET + "\n" + 
+            Color::YELLOW + "> " +
             Color::RESET;
 
         string line = readLineNice(prompt, commands, history);
