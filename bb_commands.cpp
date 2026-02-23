@@ -316,6 +316,7 @@ void registerCommands(CommandMap& commands) {
         cout << "search <p>  - Recursively searches for pattern\n";
         cout << "grub        - Edits grub config and updates it\n";
         cout << "bash        - Creates and executes temporary bash script\n";
+        cout << "off         - Shuts off computer\n";
 
         cout << "update-biba - Updates Bitch Batch\n";
 
@@ -399,6 +400,16 @@ void registerCommands(CommandMap& commands) {
         cout << "\n";
     };
 
+    commands["hack fbi"] = [&](const std::vector<std::string>&) {
+        cmd("hollywood");
+        cout << "\n";
+    };
+
+    commands["hack matrix"] = [&](const std::vector<std::string>&) {
+        cmd("cmatrix");
+        cout << "\n";
+    };
+
     commands["mem"] = [&](const std::vector<std::string>&) {
         cmd("free -h");
         cout << "\n";
@@ -427,7 +438,7 @@ void registerCommands(CommandMap& commands) {
 
         std::vector<std::string> pkgs = {
             "curl","wget","git","htop","btop","iptraf","atop","iotop","glances","iperf",
-            "gcc","lolcat","nano","vim","ranger","mc","figlet"
+            "gcc","lolcat","nano","vim","ranger","mc","figlet","cmatrix","hollywood"
         };
 
         pkgInstall(PM, pkgs);
