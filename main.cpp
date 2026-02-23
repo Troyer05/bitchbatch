@@ -26,7 +26,7 @@ int main() {
 
     CLS();
 
-    cout << "Bitch Batch\n\n";
+    cmd("figlet BITCHBATCH");
 
     if (getUser() != "root") {
         cout << Color::RED << "Run me as root please :,(\n\n" << Color::RESET;
