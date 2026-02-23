@@ -24,18 +24,16 @@ enum class PkgMgr {
     ZYPPER,
     APK,
     XBPS,
-    PKG,      // FreeBSD
+    PKG,
     UNKNOWN
 };
 
 static bool binExists(const std::string& bin) {
-    // "command -v" ist POSIX, läuft auf Linux/macOS/BSD
     std::string s = "command -v " + bin + " >/dev/null 2>&1";
     return (std::system(s.c_str()) == 0);
 }
 
 static PkgMgr detectPkgMgr() {
-    // Priorität so wählen, dass "modernere" zuerst greifen
     if (binExists("apt-get") || binExists("apt")) return PkgMgr::APT;
     if (binExists("dnf")) return PkgMgr::DNF;
     if (binExists("yum")) return PkgMgr::YUM;
@@ -115,8 +113,6 @@ static void pkgUpgrade(PkgMgr m) {
             cmd("sudo apk upgrade");
             break;
         case PkgMgr::XBPS:
-            // xbps macht update+upgrade zusammen in pkgUpdate() bereits,
-            // aber wir lassen es hier trotzdem sauber:
             cmd("sudo xbps-install -Suy");
             break;
         case PkgMgr::PKG:
@@ -140,14 +136,12 @@ static void pkgAutoremove(PkgMgr m) {
             cmd("sudo yum -y autoremove");
             break;
         case PkgMgr::PACMAN:
-            // Entfernt verwaiste Pakete
             cmd("bash -lc 'sudo pacman -Qtdq >/dev/null 2>&1 && sudo pacman -Rns --noconfirm $(pacman -Qtdq) || true'");
             break;
         case PkgMgr::ZYPPER:
-            cmd("sudo zypper --non-interactive packages --orphaned"); // nur anzeigen
+            cmd("sudo zypper --non-interactive packages --orphaned");
             break;
         case PkgMgr::APK:
-            // kein direktes autoremove
             break;
         case PkgMgr::XBPS:
             cmd("sudo xbps-remove -o");
@@ -283,8 +277,6 @@ void registerCommands(CommandMap& commands) {
     std::signal(SIGINT, onSigInt);
 
     static const PkgMgr PM = detectPkgMgr();
-    // optional zum Debuggen:
-    // cout << "[pkg] detected: " << mgrName(PM) << "\n";
 
     commands["help"] = [&](const std::vector<std::string>&) {
         cout << "\nAvailable Commands:\n";
@@ -335,15 +327,11 @@ void registerCommands(CommandMap& commands) {
     };
 
     commands["update-biba"] = [&](const std::vector<std::string>&) {
-        cmd(
-            "set -e; "
-            "tmpdir=$(mktemp -d); "
-            "trap 'rm -rf \"$tmpdir\"' EXIT; "
-            "git clone --depth 1 https://github.com/Troyer05/bitchbatch.git \"$tmpdir/bitchbatch\"; "
-            "cd \"$tmpdir/bitchbatch\"; "
-            "chmod +x install.sh; "
-            "sudo ./install.sh"
-        );
+        cmd("sudo rm -r bitchbatch");
+        cmd("sudo rm -r /sbin/biba");
+        cmd("git clone https://github.com/Troyer05/bitchbatch.git");
+        cmd("sudo chmod +x bitchbatch/install.sh");
+        cmd("sudo bash bitchbatch/install.sh");
 
         cout << "\nUpdate finished. Restarting...\n\n";
 
@@ -441,7 +429,6 @@ void registerCommands(CommandMap& commands) {
         cout << "\n";
     };
 
-    // ==== ====
 
     commands["mk"] = [&](const std::vector<std::string>& args) {
         if (args.size() < 2) {
