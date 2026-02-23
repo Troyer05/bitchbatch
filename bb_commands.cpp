@@ -427,7 +427,7 @@ void registerCommands(CommandMap& commands) {
 
         std::vector<std::string> pkgs = {
             "curl","wget","git","htop","btop","iptraf","atop","iotop","glances","iperf",
-            "gcc","lolcat","nano","vim","ranger","mc"
+            "gcc","lolcat","nano","vim","ranger","mc","figlet"
         };
 
         pkgInstall(PM, pkgs);
