@@ -30,9 +30,20 @@ int main() {
     historyInit(500);
     loadHistory(hist, 500);
 
+    std::string figlet = findCommand("figlet");
+    std::string lolcat = findCommand("lolcat");
+
     CLS();
 
-    cmd("figlet BITCHBATCH");
+    if (!figlet.empty()) {
+        if (!lolcat.empty()) {
+            cmd(figlet + " BITCHBATCH | " + lolcat);
+        } else {
+            cmd(figlet + " BITCHBATCH");
+        }
+    } else {
+        cout << Color::GREEN << "BITCHBATCH\n\n";
+    }
 
     if (getUser() != "root") {
         cout << Color::RED << "Run me as root please :,(\n\n" << Color::RESET;

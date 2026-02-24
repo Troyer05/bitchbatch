@@ -13,6 +13,14 @@ namespace Color {
     const std::string CYAN  = "\033[36m";
 }
 
+std::string getVersion() {
+    return "1.0";
+}
+
+std::string getProgrammers() {
+    return "Markus Müller";
+}
+
 std::string getUser() {
     const char* u = getenv("USER");
     if (u && *u) return u;

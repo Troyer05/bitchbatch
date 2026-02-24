@@ -12,6 +12,8 @@ namespace Color {
     extern const std::string CYAN;
 }
 
+std::string getVersion();
+std::string getProgrammers();
 std::string getUser();
 std::string getHost();
 std::string getCwd();

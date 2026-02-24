@@ -3,6 +3,7 @@
 #include "bb_exec.h"
 #include "bb_search.h"
 #include "bb_signal.h"
+#include "bb_env.h"
 #include "history.h"
 
 #include <unistd.h>
@@ -274,6 +275,74 @@ static void pkgUninstall(PkgMgr m, const std::vector<std::string>& pkgs) {
     }
 }
 
+static bool hasCommand(const char* cmd) {
+    const char* path = getenv("PATH");
+
+    if (!path) return false;
+
+    std::string p(path);
+
+    size_t start = 0;
+
+    while (start <= p.size()) {
+        size_t end = p.find(':', start);
+
+        if (end == std::string::npos) end = p.size();
+
+        std::string dir = p.substr(start, end - start);
+
+        if (dir.empty()) dir = ".";
+
+        std::string full = dir + "/" + cmd;
+
+        if (access(full.c_str(), X_OK) == 0) return true;
+
+        start = end + 1;
+    }
+
+    return false;
+}
+
+std::string findCommand(const std::string& cmd) {
+    const char* path = getenv("PATH");
+
+    if (path) {
+        std::string p(path);
+
+        size_t start = 0;
+
+        while (start <= p.size()) {
+            size_t end = p.find(':', start);
+
+            if (end == std::string::npos) end = p.size();
+
+            std::string dir = p.substr(start, end - start);
+
+            if (dir.empty()) dir = ".";
+
+            std::string full = dir + "/" + cmd;
+
+            if (access(full.c_str(), X_OK) == 0) return full;
+
+            start = end + 1;
+        }
+    }
+
+    std::vector<std::string> fallback = {
+        "/usr/games",
+        "/usr/local/bin",
+        "/usr/bin"
+    };
+
+    for (auto& dir : fallback) {
+        std::string full = dir + "/" + cmd;
+
+        if (access(full.c_str(), X_OK) == 0) return full;
+    }
+
+    return "";
+}
+
 void registerCommands(CommandMap& commands) {
     std::signal(SIGINT, onSigInt);
 
@@ -417,6 +486,14 @@ void registerCommands(CommandMap& commands) {
         exit(0);
     };
 
+    commands["info"] = commands["credits"] = [&](const std::vector<std::string>&) {
+        cout << "\n\n";
+        cout << "Version: " << getVersion() << "\n";
+        cout << "Entwickler: " << getProgrammers() << "\n";
+        cout << "\nThanks for using BitchBatch!";
+        cout << "\n\n";
+    };
+
     commands["ch"] = [&](const std::vector<std::string>&) {
         clearHistory(historyVec());
 
@@ -436,7 +513,7 @@ void registerCommands(CommandMap& commands) {
 
         std::vector<std::string> pkgs = {
             "curl","wget","git","htop","btop","iptraf","atop","iotop","glances","iperf",
-            "gcc","lolcat","nano","vim","ranger","mc","figlet","cmatrix","hollywood"
+            "gcc","lolcat","nano","vim","ranger","mc","figlet","cmatrix","hollywood","figlet"
         };
 
         pkgInstall(PM, pkgs);
@@ -592,7 +669,7 @@ void registerCommands(CommandMap& commands) {
     };
 
 
-    commands["install"] = [&](const std::vector<std::string>& args) {
+    commands["i"] = commands["install"] = [&](const std::vector<std::string>& args) {
         if (args.size() < 2) { cout << "usage: install <package...>\n\n"; return; }
 
         std::vector<std::string> pkgs(args.begin() + 1, args.end());
