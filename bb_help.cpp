@@ -115,6 +115,11 @@ void basicHelp(PkgMgr pm) {
     cout << "--------------------------------------------------------------------\n";
     cout << "update-biba           Update from GitHub and restart\n\n";
 
+    cout << "Development\n";
+    cout << "--------------------------------------------------------------------\n";
+    cout << "deploy <msg>          Deploys on github with provided commit message\n";
+    cout << "rebuild               Rebuilds the test binary\n\n";
+
     cout << "Notes\n";
     cout << "--------------------------------------------------------------------\n";
     cout << "- Some commands use sudo.\n";

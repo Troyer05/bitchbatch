@@ -138,6 +138,11 @@ void registerCommands(CommandMap& commands) {
         cout << "\n";
     };
 
+    commands["rebuild"] = [&](const std::vector<std::string>&) {
+        cmd("sudo bash build.sh");
+        exit(0);
+    };
+
     commands["grub"] = [&](const std::vector<std::string>&) {
         cmd("sudo nano /etc/default/grub");
         cmd("sudo update-grub");
@@ -379,7 +384,7 @@ void registerCommands(CommandMap& commands) {
             if (c == '"') safeMsg += "\\\"";
             else safeMsg += c;
         }
-        
+
         std::vector<std::string> add = {"git","add","."};
         std::vector<std::string> commit = {"git","commit","-m", msg};
         std::vector<std::string> push = {"git","push","origin","main"};
