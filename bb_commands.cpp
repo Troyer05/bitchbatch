@@ -417,6 +417,8 @@ void registerCommands(CommandMap& commands) {
         cout << "--------------------------------------------------------------------\n";
         cout << "history [N]           Print history (optionally last N entries)\n";
         cout << "history -c            Clear history\n";
+        cout << "hist [N]           Print history (optionally last N entries)\n";
+        cout << "hist -c            Clear history\n";
         cout << "ch                    Clear history\n";
         cout << "\n";
 
@@ -445,11 +447,13 @@ void registerCommands(CommandMap& commands) {
     commands["update-biba"] = [&](const std::vector<std::string>&) {
         cmd("sudo rm -r bitchbatch");
         cmd("sudo rm /usr/local/bin/biba");
+        cmd("sudo rm /sbin/biba");
         cmd("git clone https://github.com/Troyer05/bitchbatch.git");
         cmd("sudo chmod +x bitchbatch/install.sh");
         cmd("sudo bash bitchbatch/install.sh");
         cmd("sudo cp bitchbatch/biba /usr/local/bin/biba");
         cmd("sudo cp bitchbatch/biba /usr/sbin/biba");
+        cmd("sudo cp bitchbatch/biba /sbin/biba");
 
         cout << "\nUpdate finished. Restarting...\n\n";
 
@@ -560,7 +564,7 @@ void registerCommands(CommandMap& commands) {
         cout << "\n";
     };
 
-    commands["history"] = [&](const std::vector<std::string>& args) {
+    commands["hist"] = commands["history"] = [&](const std::vector<std::string>& args) {
         auto& hist = historyVec();
 
         if (args.size() == 2 && args[1] == "-c") {
