@@ -283,11 +283,7 @@ static std::vector<std::string> completeFiles(const std::string& token) {
 }
 
 
-static void printMatches(const std::vector<std::string>& m,
-                         const std::string& prompt,
-                         const std::string& buf,
-                         size_t cur)
-{
+static void printMatches(const std::vector<std::string>& m, const std::string& prompt, const std::string& buf, size_t cur) {
     std::cout << "\n";
 
     for (size_t i = 0; i < m.size(); i++) {
@@ -315,11 +311,11 @@ static int selectFromList(std::vector<std::string> items, int maxMenu = 8) {
     auto clampWindow = [&]() {
         if (sel < 0) sel = 0;
         if (sel > total - 1) sel = total - 1;
-
         if (sel < top) top = sel;
         if (sel >= top + view) top = sel - (view - 1);
 
         int topMax = std::max(0, total - view);
+
         if (top < 0) top = 0;
         if (top > topMax) top = topMax;
     };
@@ -798,6 +794,7 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
             cur++;
 
             redraw(prompt, buf, cur);
+
             continue;
         }
     }

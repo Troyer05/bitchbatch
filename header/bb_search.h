@@ -6,6 +6,6 @@
 
 extern volatile sig_atomic_t g_sigint;
 
-void searchRecursive(const std::string& root, const std::string& pattern);
+void searchRecursive(const std::string& root, const std::string& pattern, bool inFiles);
 
 #endif

@@ -282,21 +282,17 @@ void registerCommands(CommandMap& commands) {
     commands["help"] = [&](const std::vector<std::string>&) {
         cout << "\nAvailable Commands:\n";
         cout << "------------------------------------------------------------\n";
-
         cout << "help        - Shows this help overview\n";
         cout << "cls/clear/c - Clears the screen\n";
         cout << "exit/exut   - Exits the program\n";
-
         cout << "l/dir       - Lists directory content (ls -alh)\n";
         cout << "cd <dir>    - Changes current directory\n";
         cout << "mk <dir>    - Creates directory and enters it\n";
         cout << "rm <path>   - Removes file or directory recursively\n";
-
         cout << "ip          - Shows network interfaces\n";
         cout << "ports       - Shows open ports and listening services\n";
         cout << "mem         - Shows RAM usage\n";
         cout << "disk        - Shows disk usage\n";
-
         cout << "update      - Runs apt update/upgrade/autoremove\n";
         cout << "install <p> - Installs apt package\n";
         cout << "uninstall<p>- Removes apt package completely\n";
@@ -308,21 +304,21 @@ void registerCommands(CommandMap& commands) {
         cout << "stop <svc>  - Stops service\n";
         cout << "restart<svc>- Restarts service\n";
         cout << "status <svc>- Shows service status\n";
-
         cout << "e <file>    - Opens file in nano\n";
         cout << "v <file>    - Opens file in vim\n";
         cout << "me <file>   - Opens file in mcedit\n";
         cout << "cl <path>   - Opens ranger file manager\n";
-
+        cout << "\n";
         cout << "search <p>  - Recursively searches for pattern\n";
+        cout << "--in-files  - Optional flag to search IN files instead of filenames / dirnames\n";
+        cout << "-if  - Optional flag to search IN files instead of filenames / dirnames\n";
+        cout << "\n";
         cout << "grub        - Edits grub config and updates it\n";
         cout << "bash <o:f>  - Creates and executes temporary bash script or with parameter <file.sh> executes .sh file\n";
         cout << "off         - Shuts off computer\n";
         cout << "ch          - Clears history\n";
         cout << "history     - Prints history";
-
         cout << "update-biba - Updates Bitch Batch\n";
-
         cout << "------------------------------------------------------------\n\n";
     };
 
@@ -675,16 +671,52 @@ void registerCommands(CommandMap& commands) {
     };
 
     commands["search"] = [&](const std::vector<std::string>& args) {
-        if (args.size() < 2) { cout << "usage: search <pattern>\n\n"; return; }
+        if (args.size() < 2) {
+            cout << "usage: search <pattern> [--in-files|-if]\n\n";
+            return;
+        }
+
+        auto isFlag = [&](const std::string& s) {
+            return s == "--in-files" || s == "--fin-files" || s == "-if";
+        };
+
+        bool inFiles = false;
+
+        std::string pattern;
+
+        size_t i = 1;
+
+        for (; i < args.size(); i++) {
+            if (isFlag(args[i])) break;
+            if (!pattern.empty()) pattern += " ";
+
+            pattern += args[i];
+        }
+
+        for (; i < args.size(); i++) {
+            if (isFlag(args[i])) inFiles = true;
+        }
+
+        if (pattern.size() >= 2) {
+            char q = pattern.front();
+
+            if ((q == '"' || q == '\'') && pattern.back() == q) {
+                pattern = pattern.substr(1, pattern.size() - 2);
+            }
+        }
+
+        if (pattern.empty()) {
+            cout << "usage: search <pattern> [--in-files|-if|-f]\n\n";
+            return;
+        }
 
         auto cwd = std::filesystem::current_path().string();
-
+        
         if (cwd == "/") {
             cout << "Hint: Searching / will skip /proc,/sys,/dev,/run to avoid crashes.\n\n";
         }
 
-        searchRecursive(cwd, args[1]);
-
+        searchRecursive(cwd, pattern, inFiles);
         cout << "\n";
     };
 
