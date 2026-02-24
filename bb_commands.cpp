@@ -374,13 +374,19 @@ void registerCommands(CommandMap& commands) {
         }
 
         std::string safeMsg;
-        
+
         for (char c : msg) {
             if (c == '"') safeMsg += "\\\"";
             else safeMsg += c;
         }
+        
+        std::vector<std::string> add = {"git","add","."};
+        std::vector<std::string> commit = {"git","commit","-m", msg};
+        std::vector<std::string> push = {"git","push","origin","main"};
 
-        cmd("git add . && git commit -m \"" + safeMsg + "\" && git push origin main");
+        cmdArgs(add);
+        cmdArgs(commit);
+        cmdArgs(push);
 
         cout << "\n";
     };
