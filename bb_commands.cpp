@@ -349,46 +349,93 @@ void registerCommands(CommandMap& commands) {
     static const PkgMgr PM = detectPkgMgr();
 
     commands["help"] = [&](const std::vector<std::string>&) {
-        cout << "\nAvailable Commands:\n";
-        cout << "------------------------------------------------------------\n";
-        cout << "help        - Shows this help overview\n";
-        cout << "cls/clear/c - Clears the screen\n";
-        cout << "exit/exut   - Exits the program\n";
-        cout << "l/dir       - Lists directory content (ls -alh)\n";
-        cout << "cd <dir>    - Changes current directory\n";
-        cout << "mk <dir>    - Creates directory and enters it\n";
-        cout << "rm <path>   - Removes file or directory recursively\n";
-        cout << "ip          - Shows network interfaces\n";
-        cout << "ports       - Shows open ports and listening services\n";
-        cout << "mem         - Shows RAM usage\n";
-        cout << "disk        - Shows disk usage\n";
-        cout << "update      - Runs apt update/upgrade/autoremove\n";
-        cout << "install <p> - Installs apt package\n";
-        cout << "uninstall<p>- Removes apt package completely\n";
-        cout << "init        - Installs common admin tools\n";
+        cout << "\nBitchBatch - Help \n";
+        cout << "====================================================================\n\n";
 
-        cout << "en <svc>    - Enables systemd service\n";
-        cout << "dis <svc>   - Disables systemd service\n";
-        cout << "start <svc> - Starts service\n";
-        cout << "stop <svc>  - Stops service\n";
-        cout << "restart<svc>- Restarts service\n";
-        cout << "status <svc>- Shows service status\n";
-        cout << "e <file>    - Opens file in nano\n";
-        cout << "v <file>    - Opens file in vim\n";
-        cout << "me <file>   - Opens file in mcedit\n";
-        cout << "cl <path>   - Opens ranger file manager\n";
+        cout << "Basics\n";
+        cout << "--------------------------------------------------------------------\n";
+        cout << "help                 Show this help\n";
+        cout << "cls | clear | c       Clear the screen\n";
+        cout << "exit | exut           Exit the program\n";
+        cout << "info | credits        Show version / credits\n";
         cout << "\n";
-        cout << "search <p>  - Recursively searches for pattern\n";
-        cout << "--in-files  - Optional flag to search IN files instead of filenames / dirnames\n";
-        cout << "-if  - Optional flag to search IN files instead of filenames / dirnames\n";
+
+        cout << "Filesystem\n";
+        cout << "--------------------------------------------------------------------\n";
+        cout << "l | dir               List directory content (ls -alh)\n";
+        cout << "cd [dir]              Change directory (default: $HOME)\n";
+        cout << "mk <dir...>           Create directory(s) and cd into first one\n";
+        cout << "rm <path...>          Remove files/directories recursively\n";
+        cout << "cl [path]             Open ranger file manager (default: .)\n";
+        cout << "e <file...>           Edit file(s) with nano (sudo)\n";
+        cout << "v [file...]           Open vim (or vim <file...>)\n";
+        cout << "me [path]             Open mcedit (default: .)\n";
         cout << "\n";
-        cout << "grub        - Edits grub config and updates it\n";
-        cout << "bash <o:f>  - Creates and executes temporary bash script or with parameter <file.sh> executes .sh file\n";
-        cout << "off         - Shuts off computer\n";
-        cout << "ch          - Clears history\n";
-        cout << "history     - Prints history";
-        cout << "update-biba - Updates Bitch Batch\n";
-        cout << "------------------------------------------------------------\n\n";
+
+        cout << "System / Network\n";
+        cout << "--------------------------------------------------------------------\n";
+        cout << "ip                   Show network interfaces (ip a)\n";
+        cout << "ports                Show listening ports/services (ss -tulpn)\n";
+        cout << "mem                  Show RAM usage (free -h)\n";
+        cout << "disk                 Show disk usage (df -h)\n";
+        cout << "grub                 Edit grub config and update-grub\n";
+        cout << "off                  Power off the machine\n";
+        cout << "\n";
+
+        cout << "Package Management (" << mgrName(PM) << ")\n";
+        cout << "--------------------------------------------------------------------\n";
+        cout << "update               Update + upgrade + cleanup\n";
+        cout << "i | install <pkg...>  Install package(s)\n";
+        cout << "ui | uninstall <pkg...>  Uninstall package(s) (purge/remove)\n";
+        cout << "init                 Install common admin tools\n";
+        cout << "\n";
+
+        cout << "systemd Services\n";
+        cout << "--------------------------------------------------------------------\n";
+        cout << "en <service>         Enable service\n";
+        cout << "dis <service>        Disable service\n";
+        cout << "start <service>      Start service\n";
+        cout << "stop <service>       Stop service\n";
+        cout << "restart <service>    Restart service\n";
+        cout << "status <service>     Show service status\n";
+        cout << "\n";
+
+        cout << "Search\n";
+        cout << "--------------------------------------------------------------------\n";
+        cout << "search | find <pattern> [--in-files|-if]\n";
+        cout << "                     Search recursively for pattern in names (default)\n";
+        cout << "                     Use --in-files / -if to search inside file contents\n";
+        cout << "\n";
+
+        cout << "Scripting\n";
+        cout << "--------------------------------------------------------------------\n";
+        cout << "b | bash              Create & run temporary bash script (nano)\n";
+        cout << "b | bash <file.sh>    Run a bash script (sudo bash <file.sh>)\n";
+        cout << "\n";
+
+        cout << "History\n";
+        cout << "--------------------------------------------------------------------\n";
+        cout << "history [N]           Print history (optionally last N entries)\n";
+        cout << "history -c            Clear history\n";
+        cout << "ch                    Clear history\n";
+        cout << "\n";
+
+        cout << "Fun\n";
+        cout << "--------------------------------------------------------------------\n";
+        cout << "hack fbi             hollywood\n";
+        cout << "hack matrix          cmatrix\n";
+        cout << "\n";
+
+        cout << "Maintenance\n";
+        cout << "--------------------------------------------------------------------\n";
+        cout << "update-biba          Reinstall/update from GitHub and restart\n";
+        cout << "\n";
+
+        cout << "Notes\n";
+        cout << "--------------------------------------------------------------------\n";
+        cout << "- Some commands use sudo.\n";
+        cout << "- Package manager detected: " << mgrName(PM) << "\n";
+        cout << "====================================================================\n\n";
     };
 
     commands["cls"] = [&](const std::vector<std::string>&) {
@@ -458,16 +505,6 @@ void registerCommands(CommandMap& commands) {
 
     commands["ip"] = [&](const std::vector<std::string>&) {
         cmd("ip a");
-        cout << "\n";
-    };
-
-    commands["hack fbi"] = [&](const std::vector<std::string>&) {
-        cmd("hollywood");
-        cout << "\n";
-    };
-
-    commands["hack matrix"] = [&](const std::vector<std::string>&) {
-        cmd("cmatrix");
         cout << "\n";
     };
 
@@ -679,7 +716,7 @@ void registerCommands(CommandMap& commands) {
         cout << "\n";
     };
 
-    commands["bash"] = [&](const std::vector<std::string>& args) {
+    commands["b"] = commands["bash"] = [&](const std::vector<std::string>& args) {
         if (args.size() < 2) {
             cmd("sudo nano bitchtmp.sh");
             cmd("sudo chmod +x bitchtmp.sh");
@@ -715,7 +752,7 @@ void registerCommands(CommandMap& commands) {
         cout << "\n";
     };
 
-    commands["uninstall"] = [&](const std::vector<std::string>& args) {
+    commands["ui"] = commands["uninstall"] = [&](const std::vector<std::string>& args) {
         if (args.size() < 2) {
             cout << "usage: uninstall <package...>\n\n";
             return;
@@ -747,7 +784,7 @@ void registerCommands(CommandMap& commands) {
         }
     };
 
-    commands["search"] = [&](const std::vector<std::string>& args) {
+    commands["find"] = commands["search"] = [&](const std::vector<std::string>& args) {
         if (args.size() < 2) {
             cout << "usage: search <pattern> [--in-files|-if]\n\n";
             return;
