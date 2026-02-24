@@ -468,7 +468,6 @@ void registerCommands(CommandMap& commands) {
 
         size_t start = 0;
 
-        // Optional: history 20  -> letzte 20 anzeigen
         if (args.size() == 2) {
             try {
                 size_t n = std::stoul(args[1]);
@@ -476,7 +475,6 @@ void registerCommands(CommandMap& commands) {
                 if (n < hist.size())
                     start = hist.size() - n;
             } catch (...) {
-                // ignore invalid number
             }
         }
 
@@ -617,7 +615,7 @@ void registerCommands(CommandMap& commands) {
             
             cout << "\n";
 
-            return;   // ← WICHTIG
+            return;
         }
 
         std::vector<std::string> p = {"sudo", "bash"};

@@ -11,6 +11,25 @@
 #include <iostream>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <sys/select.h>
+
+static bool readByteTimeout(unsigned char& c, int timeoutMs) {
+    fd_set set;
+
+    FD_ZERO(&set);
+    FD_SET(STDIN_FILENO, &set);
+
+    timeval tv{};
+
+    tv.tv_sec  = timeoutMs / 1000;
+    tv.tv_usec = (timeoutMs % 1000) * 1000;
+
+    int r = select(STDIN_FILENO + 1, &set, nullptr, nullptr, &tv);
+
+    if (r > 0) return read(STDIN_FILENO, &c, 1) == 1;
+
+    return false;
+}
 
 static int termCols() {
     winsize ws{};
@@ -172,7 +191,15 @@ static std::vector<std::string> completeCommands(const std::string& prefix, cons
 }
 
 static std::vector<std::string> completeFiles(const std::string& token) {
-    std::vector<std::string> out;
+    struct Item {
+        std::string shown;
+        std::string name;
+
+        bool isDir = false;
+    };
+
+    std::vector<Item> items;
+
     std::string dir = ".";
     std::string pref = token;
 
@@ -185,7 +212,7 @@ static std::vector<std::string> completeFiles(const std::string& token) {
     }
 
     std::string realDir = dir;
-
+    
     if (realDir == "~") {
         const char* h = getenv("HOME");
         if (h && *h) realDir = h;
@@ -196,7 +223,7 @@ static std::vector<std::string> completeFiles(const std::string& token) {
 
     DIR* dp = opendir(realDir.c_str());
 
-    if (!dp) return out;
+    if (!dp) return {};
 
     while (auto* de = readdir(dp)) {
         std::string name = de->d_name;
@@ -204,17 +231,53 @@ static std::vector<std::string> completeFiles(const std::string& token) {
         if (name == "." || name == "..") continue;
         if (!startsWith(name, pref)) continue;
 
-        std::string full;
+        std::string shown;
 
-        if (slash != std::string::npos) full = token.substr(0, slash + 1) + name;
-        else full = name;
+        if (slash != std::string::npos) shown = token.substr(0, slash + 1) + name;
+        else shown = name;
 
-        out.push_back(full);
+        bool isDir = false;
+
+        if (de->d_type == DT_DIR) {
+            isDir = true;
+        } else {
+            std::string fullReal = realDir;
+
+            if (!fullReal.empty() && fullReal.back() != '/') fullReal += "/";
+
+            fullReal += name;
+
+            struct stat st{};
+            
+            if (stat(fullReal.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+                isDir = true;
+            }
+        }
+
+        items.push_back({shown, name, isDir});
     }
 
     closedir(dp);
 
-    std::sort(out.begin(), out.end());
+    std::sort(items.begin(), items.end(), [](const Item& a, const Item& b) {
+        if (a.isDir != b.isDir) return a.isDir > b.isDir;
+        return a.name < b.name;
+    });
+
+    items.erase(std::unique(items.begin(), items.end(),
+        [](const Item& a, const Item& b){ return a.shown == b.shown; }
+    ), items.end());
+
+    std::vector<std::string> out;
+    out.reserve(items.size());
+
+    for (auto& it : items) {
+        if (it.isDir) {
+            if (!it.shown.empty() && it.shown.back() != '/') it.shown.push_back('/');
+        }
+
+        out.push_back(it.shown);
+    }
 
     return out;
 }
@@ -236,59 +299,35 @@ static void printMatches(const std::vector<std::string>& m,
     redraw(prompt, buf, cur);
 }
 
-static int selectFromList(const std::vector<std::string>& items, int maxMenu = 8) {
+static int selectFromList(std::vector<std::string> items, int maxMenu = 8) {
     if (items.empty()) return -1;
 
-    int total = (int)items.size();
-    int view = total > maxMenu ? maxMenu : total;
+    const int total = (int)items.size();
+    const int view  = std::min(maxMenu, total);
 
-    bool more = total > view;
-
-    int lines = view + (more ? 1 : 0);
     int sel = 0;
     int top = 0;
 
-    auto up = [&](int n) { if (n > 0) std::cout << "\033[" << n << "A"; };
+    const int lines = view + 1;
+
     auto clearLine = [&]() { std::cout << "\r\033[2K"; };
 
-    auto clearMenu = [&]() {
-        up(lines);
+    auto clampWindow = [&]() {
+        if (sel < 0) sel = 0;
+        if (sel > total - 1) sel = total - 1;
 
-        for (int i = 0; i < lines; i++) {
-            clearLine();
-            if (i + 1 < lines) std::cout << "\n";
-        }
+        if (sel < top) top = sel;
+        if (sel >= top + view) top = sel - (view - 1);
 
-        up(lines - 1);
-        std::cout << std::flush;
+        int topMax = std::max(0, total - view);
+        if (top < 0) top = 0;
+        if (top > topMax) top = topMax;
     };
 
-    auto drawMenu = [&]() {
-        up(lines);
+    auto anchorSave = [&]() { std::cout << "\033[s" << std::flush; };
+    auto anchorRestore = [&]() { std::cout << "\033[u" << std::flush; };
 
-        for (int i = 0; i < view; i++) {
-            int idx = top + i;
-
-            clearLine();
-
-            if (idx == sel) std::cout << "\033[7m";
-
-            std::cout << items[idx];
-
-            if (idx == sel) std::cout << "\033[0m";
-
-            std::cout << "\n";
-        }
-
-        if (more) {
-            clearLine();
-            int hidden = total - view;
-            std::cout << "... (+" << hidden << ")\n";
-        }
-
-        up(lines - 1);
-        std::cout << std::flush;
-    };
+    anchorSave();
 
     std::cout << "\n";
 
@@ -297,20 +336,70 @@ static int selectFromList(const std::vector<std::string>& items, int maxMenu = 8
         if (i + 1 < lines) std::cout << "\n";
     }
 
-    up(lines - 1);
+    std::cout << "\033[" << (lines - 1) << "A\r" << std::flush;
 
-    std::cout << std::flush;
+    auto drawMenu = [&]() {
+        clampWindow();
+
+        for (int i = 0; i < view; i++) {
+            int idx = top + i;
+
+            clearLine();
+
+            if (idx == sel) {
+                std::cout << "\033[48;5;238m\033[38;5;15m";
+                std::cout << " " << items[idx] << " ";
+                std::cout << "\033[0m";
+            } else {
+                std::cout << " " << items[idx];
+            }
+
+            std::cout << "\n";
+        }
+
+        clearLine();
+
+        int remainingAbove = top;
+        int remainingBelow = total - (top + view);
+
+        if (remainingAbove > 0 || remainingBelow > 0) {
+            std::cout << "\033[2m... ";
+
+            if (remainingAbove > 0) std::cout << "(+" << remainingAbove << " oben) ";
+            if (remainingBelow > 0) std::cout << "(+" << remainingBelow << " unten)";
+
+            std::cout << "\033[0m";
+        }
+
+        std::cout << std::flush;
+        std::cout << "\033[" << (lines - 1) << "A\r" << std::flush;
+    };
+
+    auto clearMenu = [&]() {
+        for (int i = 0; i < lines; i++) {
+            clearLine();
+            std::cout << "\n";
+        }
+
+        anchorRestore();
+
+        std::cout << "\r" << std::flush;
+    };
 
     drawMenu();
 
     while (true) {
         unsigned char c = 0;
-
         if (!readByte(c)) continue;
 
         if (c == '\n' || c == '\r') {
             clearMenu();
             return sel;
+        }
+
+        if (c == 'q' || c == 'Q') {
+            clearMenu();
+            return -1;
         }
 
         if (c == 3) {
@@ -319,41 +408,52 @@ static int selectFromList(const std::vector<std::string>& items, int maxMenu = 8
         }
 
         if (c == 27) {
-            unsigned char a = 0, b = 0;
+            unsigned char a = 0;
 
-            if (!readByte(a) || !readByte(b)) {
+            if (!readByteTimeout(a, 30)) {
                 clearMenu();
                 return -1;
             }
 
             if (a == '[') {
+                unsigned char b = 0;
+                if (!readByteTimeout(b, 30)) {
+                    clearMenu();
+                    return -1;
+                }
+
                 if (b == 'A') {
-                    if (sel > 0) sel--;
-                    if (sel < top) top = sel;
-                    if (sel >= top + view) top = sel - (view - 1);
-
+                    sel--;
                     drawMenu();
-
                     continue;
                 }
 
                 if (b == 'B') {
-                    if (sel < total - 1) sel++;
-                    if (sel < top) top = sel;
-                    if (sel >= top + view) top = sel - (view - 1);
-
+                    sel++;
                     drawMenu();
-
                     continue;
+                }
+
+                if (b == '5' || b == '6') {
+                    unsigned char t = 0;
+
+                    if (readByteTimeout(t, 30) && t == '~') {
+                        if (b == '5') sel -= view;
+                        else sel += view;
+
+                        drawMenu();
+
+                        continue;
+                    }
                 }
             }
 
             clearMenu();
+
             return -1;
         }
     }
 }
-
 
 std::string readLineNice(const std::string& prompt, const CommandMap& commands, std::vector<std::string>& hist) {
     TermRaw tr;
@@ -433,6 +533,8 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                     cur += add.size();
 
                     std::string real = expandTilde(m);
+                    
+                    if (!real.empty() && real.back() == '/') real.pop_back();
 
                     if (isDirPath(real) && cur > 0 && buf[cur - 1] != '/') {
                         buf.insert(cur, "/");

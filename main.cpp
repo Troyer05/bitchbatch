@@ -25,7 +25,6 @@ int main() {
     signal(SIGINT, onSigInt);
     signal(SIGQUIT, SIG_IGN);
 
-    // Load persistent history (shared with readLineNice)
     std::vector<std::string> hist;
 
     historyInit(500);
@@ -64,13 +63,12 @@ int main() {
 
         std::string line = readLineNice(prompt, commands, historyVec());
 
-        // Save external commands too
         appendHistory(historyVec(), line, 500);
 
         if (line.empty()) continue;
 
-        // Parse tokens for builtin commands
         auto parts = splitSimple(line);
+
         if (parts.empty()) continue;
 
         auto it = commands.find(parts[0]);
@@ -78,8 +76,8 @@ int main() {
         if (it != commands.end()) {
             it->second(parts);
 
-            // Save history AFTER a successful command dispatch (optional but nice)
             appendHistory(hist, line, 500);
+
             continue;
         }
 

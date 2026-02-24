@@ -18,7 +18,9 @@ std::string historyPath() {
 
 void loadHistory(std::vector<std::string>& out, size_t maxLines) {
     out.clear();
+
     std::ifstream f(historyPath());
+
     if (!f.is_open()) return;
 
     std::deque<std::string> q;
@@ -26,8 +28,11 @@ void loadHistory(std::vector<std::string>& out, size_t maxLines) {
 
     while (std::getline(f, line)) {
         line = trimRight(line);
+
         if (line.empty()) continue;
+
         q.push_back(line);
+
         if (q.size() > maxLines) q.pop_front();
     }
 
@@ -42,11 +47,12 @@ static void appendLineToFile(const std::string& line) {
 
 void appendHistory(std::vector<std::string>& hist, const std::string& line, size_t maxLines) {
     std::string x = trimRight(line);
-    if (x.empty()) return;
 
+    if (x.empty()) return;
     if (!hist.empty() && hist.back() == x) return;
 
     hist.push_back(x);
+
     if (hist.size() > maxLines) hist.erase(hist.begin(), hist.begin() + (hist.size() - maxLines));
 
     appendLineToFile(x);
@@ -54,7 +60,6 @@ void appendHistory(std::vector<std::string>& hist, const std::string& line, size
 
 void clearHistory(std::vector<std::string>& hist) {
     hist.clear();
-    // Datei leeren (statt löschen)
     std::ofstream f(historyPath(), std::ios::trunc);
 }
 
