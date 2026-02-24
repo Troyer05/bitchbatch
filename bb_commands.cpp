@@ -4,7 +4,10 @@
 #include "bb_search.h"
 #include "bb_signal.h"
 #include "bb_env.h"
+#include "bb_help.h"
+#include "bb_aliases.h"
 #include "history.h"
+#include "pkg.h"
 
 #include <unistd.h>
 #include <cerrno>
@@ -15,264 +18,18 @@
 #include <string>
 #include <vector>
 #include <csignal>
+#include <algorithm>
+#include <cctype>
 
 using namespace std;
 
-enum class PkgMgr {
-    APT,
-    DNF,
-    YUM,
-    PACMAN,
-    ZYPPER,
-    APK,
-    XBPS,
-    PKG,
-    UNKNOWN
-};
+static inline std::string trimLocal(std::string s) {
+    auto notSpace = [](unsigned char c){ return !std::isspace(c); };
 
-static bool binExists(const std::string& bin) {
-    std::string s = "command -v " + bin + " >/dev/null 2>&1";
-    return (std::system(s.c_str()) == 0);
-}
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), notSpace));
+    s.erase(std::find_if(s.rbegin(), s.rend(), notSpace).base(), s.end());
 
-static PkgMgr detectPkgMgr() {
-    if (binExists("apt-get") || binExists("apt")) return PkgMgr::APT;
-    if (binExists("dnf")) return PkgMgr::DNF;
-    if (binExists("yum")) return PkgMgr::YUM;
-    if (binExists("pacman")) return PkgMgr::PACMAN;
-    if (binExists("zypper")) return PkgMgr::ZYPPER;
-    if (binExists("apk")) return PkgMgr::APK;
-    if (binExists("xbps-install")) return PkgMgr::XBPS;
-    if (binExists("pkg")) return PkgMgr::PKG;
-
-    return PkgMgr::UNKNOWN;
-}
-
-static std::string mgrName(PkgMgr m) {
-    switch (m) {
-        case PkgMgr::APT: return "apt";
-        case PkgMgr::DNF: return "dnf";
-        case PkgMgr::YUM: return "yum";
-        case PkgMgr::PACMAN: return "pacman";
-        case PkgMgr::ZYPPER: return "zypper";
-        case PkgMgr::APK: return "apk";
-        case PkgMgr::XBPS: return "xbps";
-        case PkgMgr::PKG: return "pkg";
-        default: return "unknown";
-    }
-}
-
-static void pkgUpdate(PkgMgr m) {
-    switch (m) {
-        case PkgMgr::APT:
-            cmd("sudo apt update");
-            break;
-        case PkgMgr::DNF:
-            cmd("sudo dnf -y makecache");
-            break;
-        case PkgMgr::YUM:
-            cmd("sudo yum -y makecache");
-            break;
-        case PkgMgr::PACMAN:
-            cmd("sudo pacman -Sy --noconfirm");
-            break;
-        case PkgMgr::ZYPPER:
-            cmd("sudo zypper --non-interactive refresh");
-            break;
-        case PkgMgr::APK:
-            cmd("sudo apk update");
-            break;
-        case PkgMgr::XBPS:
-            cmd("sudo xbps-install -Suy");
-            break;
-        case PkgMgr::PKG:
-            cmd("sudo pkg update -f");
-            break;
-        default:
-            std::cout << "No supported package manager found.\n";
-            break;
-    }
-}
-
-static void pkgUpgrade(PkgMgr m) {
-    switch (m) {
-        case PkgMgr::APT:
-            cmd("sudo apt upgrade -y");
-            break;
-        case PkgMgr::DNF:
-            cmd("sudo dnf -y upgrade");
-            break;
-        case PkgMgr::YUM:
-            cmd("sudo yum -y update");
-            break;
-        case PkgMgr::PACMAN:
-            cmd("sudo pacman -Syu --noconfirm");
-            break;
-        case PkgMgr::ZYPPER:
-            cmd("sudo zypper --non-interactive update");
-            break;
-        case PkgMgr::APK:
-            cmd("sudo apk upgrade");
-            break;
-        case PkgMgr::XBPS:
-            cmd("sudo xbps-install -Suy");
-            break;
-        case PkgMgr::PKG:
-            cmd("sudo pkg upgrade -y");
-            break;
-        default:
-            std::cout << "No supported package manager found.\n";
-            break;
-    }
-}
-
-static void pkgAutoremove(PkgMgr m) {
-    switch (m) {
-        case PkgMgr::APT:
-            cmd("sudo apt autoremove -y");
-            break;
-        case PkgMgr::DNF:
-            cmd("sudo dnf -y autoremove");
-            break;
-        case PkgMgr::YUM:
-            cmd("sudo yum -y autoremove");
-            break;
-        case PkgMgr::PACMAN:
-            cmd("bash -lc 'sudo pacman -Qtdq >/dev/null 2>&1 && sudo pacman -Rns --noconfirm $(pacman -Qtdq) || true'");
-            break;
-        case PkgMgr::ZYPPER:
-            cmd("sudo zypper --non-interactive packages --orphaned");
-            break;
-        case PkgMgr::APK:
-            break;
-        case PkgMgr::XBPS:
-            cmd("sudo xbps-remove -o");
-            break;
-        case PkgMgr::PKG:
-            cmd("sudo pkg autoremove -y");
-            break;
-        default:
-            break;
-    }
-}
-
-static void pkgInstall(PkgMgr m, const std::vector<std::string>& pkgs) {
-    if (pkgs.empty()) return;
-
-    switch (m) {
-        case PkgMgr::APT: {
-            std::string s = "sudo apt install -y";
-            for (auto& p : pkgs) s += " " + p;
-            cmd(s);
-            break;
-        }
-        case PkgMgr::DNF: {
-            std::string s = "sudo dnf -y install";
-            for (auto& p : pkgs) s += " " + p;
-            cmd(s);
-            break;
-        }
-        case PkgMgr::YUM: {
-            std::string s = "sudo yum -y install";
-            for (auto& p : pkgs) s += " " + p;
-            cmd(s);
-            break;
-        }
-        case PkgMgr::PACMAN: {
-            std::string s = "sudo pacman -S --noconfirm";
-            for (auto& p : pkgs) s += " " + p;
-            cmd(s);
-            break;
-        }
-        case PkgMgr::ZYPPER: {
-            std::string s = "sudo zypper --non-interactive install";
-            for (auto& p : pkgs) s += " " + p;
-            cmd(s);
-            break;
-        }
-        case PkgMgr::APK: {
-            std::string s = "sudo apk add";
-            for (auto& p : pkgs) s += " " + p;
-            cmd(s);
-            break;
-        }
-        case PkgMgr::XBPS: {
-            std::string s = "sudo xbps-install -y";
-            for (auto& p : pkgs) s += " " + p;
-            cmd(s);
-            break;
-        }
-        case PkgMgr::PKG: {
-            std::string s = "sudo pkg install -y";
-            for (auto& p : pkgs) s += " " + p;
-            cmd(s);
-            break;
-        }
-        default:
-            std::cout << "No supported package manager found.\n";
-            break;
-    }
-}
-
-static void pkgUninstall(PkgMgr m, const std::vector<std::string>& pkgs) {
-    if (pkgs.empty()) return;
-
-    switch (m) {
-        case PkgMgr::APT: {
-            std::string s = "sudo apt purge -y";
-            for (auto& p : pkgs) s += " " + p;
-            cmd(s);
-            cmd("sudo apt autoremove -y");
-            break;
-        }
-        case PkgMgr::DNF: {
-            std::string s = "sudo dnf -y remove";
-            for (auto& p : pkgs) s += " " + p;
-            cmd(s);
-            cmd("sudo dnf -y autoremove");
-            break;
-        }
-        case PkgMgr::YUM: {
-            std::string s = "sudo yum -y remove";
-            for (auto& p : pkgs) s += " " + p;
-            cmd(s);
-            break;
-        }
-        case PkgMgr::PACMAN: {
-            std::string s = "sudo pacman -Rns --noconfirm";
-            for (auto& p : pkgs) s += " " + p;
-            cmd(s);
-            break;
-        }
-        case PkgMgr::ZYPPER: {
-            std::string s = "sudo zypper --non-interactive remove";
-            for (auto& p : pkgs) s += " " + p;
-            cmd(s);
-            break;
-        }
-        case PkgMgr::APK: {
-            std::string s = "sudo apk del";
-            for (auto& p : pkgs) s += " " + p;
-            cmd(s);
-            break;
-        }
-        case PkgMgr::XBPS: {
-            std::string s = "sudo xbps-remove -Ry";
-            for (auto& p : pkgs) s += " " + p;
-            cmd(s);
-            break;
-        }
-        case PkgMgr::PKG: {
-            std::string s = "sudo pkg delete -y";
-            for (auto& p : pkgs) s += " " + p;
-            cmd(s);
-            cmd("sudo pkg autoremove -y");
-            break;
-        }
-        default:
-            std::cout << "No supported package manager found.\n";
-            break;
-    }
+    return s;
 }
 
 static bool hasCommand(const char* cmd) {
@@ -348,102 +105,6 @@ void registerCommands(CommandMap& commands) {
 
     static const PkgMgr PM = detectPkgMgr();
 
-    commands["help"] = [&](const std::vector<std::string>&) {
-        cout << "\nBitchBatch - Help \n";
-        cout << "====================================================================\n\n";
-
-        cout << "Basics\n";
-        cout << "--------------------------------------------------------------------\n";
-        cout << "help                 Show this help\n";
-        cout << "cls | clear | c       Clear the screen\n";
-        cout << "exit | exut           Exit the program\n";
-        cout << "info | credits        Show version / credits\n";
-        cout << "\n";
-
-        cout << "Filesystem\n";
-        cout << "--------------------------------------------------------------------\n";
-        cout << "l | dir               List directory content (ls -alh)\n";
-        cout << "cd [dir]              Change directory (default: $HOME)\n";
-        cout << "mk <dir...>           Create directory(s) and cd into first one\n";
-        cout << "rm <path...>          Remove files/directories recursively\n";
-        cout << "cl [path]             Open ranger file manager (default: .)\n";
-        cout << "e <file...>           Edit file(s) with nano (sudo)\n";
-        cout << "v [file...]           Open vim (or vim <file...>)\n";
-        cout << "me [path]             Open mcedit (default: .)\n";
-        cout << "\n";
-
-        cout << "System / Network\n";
-        cout << "--------------------------------------------------------------------\n";
-        cout << "ip                   Show network interfaces (ip a)\n";
-        cout << "ports                Show listening ports/services (ss -tulpn)\n";
-        cout << "mem                  Show RAM usage (free -h)\n";
-        cout << "disk                 Show disk usage (df -h)\n";
-        cout << "grub                 Edit grub config and update-grub\n";
-        cout << "off                  Power off the machine\n";
-        cout << "\n";
-
-        cout << "Package Management (" << mgrName(PM) << ")\n";
-        cout << "--------------------------------------------------------------------\n";
-        cout << "update               Update + upgrade + cleanup\n";
-        cout << "i | install <pkg...>  Install package(s)\n";
-        cout << "ui | uninstall <pkg...>  Uninstall package(s) (purge/remove)\n";
-        cout << "init                 Install common admin tools\n";
-        cout << "\n";
-
-        cout << "systemd Services\n";
-        cout << "--------------------------------------------------------------------\n";
-        cout << "en <service>         Enable service\n";
-        cout << "dis <service>        Disable service\n";
-        cout << "start <service>      Start service\n";
-        cout << "stop <service>       Stop service\n";
-        cout << "restart <service>    Restart service\n";
-        cout << "status <service>     Show service status\n";
-        cout << "\n";
-
-        cout << "Search\n";
-        cout << "--------------------------------------------------------------------\n";
-        cout << "search | find <pattern> [--in-files|-if]\n";
-        cout << "                     Search recursively for pattern in names (default)\n";
-        cout << "                     Use --in-files / -if to search inside file contents\n";
-        cout << "\n";
-
-        cout << "Scripting\n";
-        cout << "--------------------------------------------------------------------\n";
-        cout << "b | bash              Create & run temporary bash script (nano)\n";
-        cout << "b | bash <file.sh>    Run a bash script (sudo bash <file.sh>)\n";
-        cout << "\n";
-
-        cout << "History\n";
-        cout << "--------------------------------------------------------------------\n";
-        cout << "history [N]           Print history (optionally last N entries)\n";
-        cout << "history -c            Clear history\n";
-        cout << "hist [N]           Print history (optionally last N entries)\n";
-        cout << "hist -c            Clear history\n";
-        cout << "ch                    Clear history\n";
-        cout << "\n";
-
-        cout << "Fun\n";
-        cout << "--------------------------------------------------------------------\n";
-        cout << "hack fbi             hollywood\n";
-        cout << "hack matrix          cmatrix\n";
-        cout << "\n";
-
-        cout << "Maintenance\n";
-        cout << "--------------------------------------------------------------------\n";
-        cout << "update-biba          Reinstall/update from GitHub and restart\n";
-        cout << "\n";
-
-        cout << "Notes\n";
-        cout << "--------------------------------------------------------------------\n";
-        cout << "- Some commands use sudo.\n";
-        cout << "- Package manager detected: " << mgrName(PM) << "\n";
-        cout << "====================================================================\n\n";
-    };
-
-    commands["cls"] = [&](const std::vector<std::string>&) {
-        CLS();
-    };
-
     commands["update-biba"] = [&](const std::vector<std::string>&) {
         cmd("sudo rm -r bitchbatch");
         cmd("sudo rm /usr/local/bin/biba");
@@ -464,11 +125,11 @@ void registerCommands(CommandMap& commands) {
         exit(1);
     };
 
-    commands["clear"] = [&](const std::vector<std::string>&) {
+    commands["c"] = commands["cls"] = commands["clear"] = [&](const std::vector<std::string>&) {
         CLS();
     };
 
-    commands["exit"] = [&](const std::vector<std::string>&) {
+    commands["exut"] = commands["exit"] = [&](const std::vector<std::string>&) {
         exit(0);
     };
 
@@ -484,7 +145,7 @@ void registerCommands(CommandMap& commands) {
         cout << "\n";
     };
 
-    commands["update"] = [&](const std::vector<std::string>&) {
+    commands["u"] = commands["update"] = [&](const std::vector<std::string>&) {
         pkgUpdate(PM);
         pkgUpgrade(PM);
         pkgAutoremove(PM);
@@ -494,11 +155,6 @@ void registerCommands(CommandMap& commands) {
 
     commands["dir"] = [&](const std::vector<std::string>&) {
         cmd("ls -alh");
-        cout << "\n";
-    };
-
-    commands["c"] = [&](const std::vector<std::string>&) {
-        CLS();
         cout << "\n";
     };
 
@@ -520,11 +176,6 @@ void registerCommands(CommandMap& commands) {
     commands["disk"] = [&](const std::vector<std::string>&) {
         cmd("df -h");
         cout << "\n";
-    };
-
-    commands["exut"] = [&](const std::vector<std::string>&) {
-        cout << "\n";
-        exit(0);
     };
 
     commands["info"] = commands["credits"] = [&](const std::vector<std::string>&) {
@@ -709,6 +360,16 @@ void registerCommands(CommandMap& commands) {
         cout << "\n";
     };
 
+    commands["deploy"] = [&](const std::vector<std::string>& args) {
+        if (args.size() < 2) {
+            cout << "Fergot commit message!\n\n";
+            return;
+        }
+
+        cmd("git add . && git commit -m \"" + args[1] + "\" && git push origin main");
+
+        cout << "\n";
+    };
 
     commands["i"] = commands["install"] = [&](const std::vector<std::string>& args) {
         if (args.size() < 2) { cout << "usage: install <package...>\n\n"; return; }
@@ -878,5 +539,116 @@ void registerCommands(CommandMap& commands) {
         cmdArgs(p);
 
         cout << "\n";
+    };
+
+    commands["h"] = commands["help"] = [&](const std::vector<std::string>& args) {
+        if (args.size() < 2) {
+            basicHelp(PM);
+            return;
+        }
+
+        helpFor(args[1], PM);
+
+        cout << "\n";
+    };
+
+    commands["alias"] = [&](const std::vector<std::string>& args) {
+        if (args.size() == 1) {
+            if (getAliases().map.empty()) {
+                cout << "No aliases set.\n\n";
+                return;
+            }
+
+            std::vector<std::string> keys;
+
+            keys.reserve(getAliases().map.size());
+
+            for (auto const& kv : getAliases().map) keys.push_back(kv.first);
+
+            std::sort(keys.begin(), keys.end());
+
+            for (auto const& k : keys) {
+                cout << k << "='" << getAliases().map[k] << "'\n";
+            }
+
+            cout << "\n";
+
+            return;
+        }
+
+        std::string joined;
+
+        for (size_t i = 1; i < args.size(); ++i) {
+            if (i > 1) joined += " ";
+            joined += args[i];
+        }
+
+        auto eq = joined.find('=');
+
+        if (eq != std::string::npos) {
+            std::string name = trimLocal(joined.substr(0, eq));
+            std::string exp  = trimLocal(joined.substr(eq + 1));
+
+            if (name.empty() || exp.empty()) {
+                cout << "usage: alias name=command...\n\n";
+                return;
+            }
+
+            getAliases().set(name, exp);
+
+            if (!getAliases().save(getAliasPath())) {
+                cout << "Failed to save aliases.\n\n";
+                return;
+            }
+
+            cout << "alias " << name << "='" << exp << "'\n\n";
+
+            return;
+        }
+
+        if (args.size() >= 3) {
+            std::string name = args[1];
+            std::string exp;
+
+            for (size_t i = 2; i < args.size(); ++i) {
+                if (i > 2) exp += " ";
+                exp += args[i];
+            }
+
+            getAliases().set(name, exp);
+
+            if (!getAliases().save(getAliasPath())) {
+                cout << "Failed to save aliases.\n\n";
+                return;
+            }
+
+            cout << "alias " << name << "='" << exp << "'\n\n";
+
+            return;
+        }
+
+        cout << "usage:\n";
+        cout << "  alias\n";
+        cout << "  alias name=command...\n";
+        cout << "  alias name command...\n\n";
+    };
+
+    commands["unalias"] = [&](const std::vector<std::string>& args) {
+        if (args.size() != 2) {
+            cout << "usage: unalias <name>\n\n";
+            return;
+        }
+
+        if (!getAliases().del(args[1])) {
+            cout << "alias not found: " << args[1] << "\n\n";
+            return;
+        }
+
+        if (!getAliases().save(getAliasPath())) {
+            cout << "Failed to save aliases.\n\n";
+            return;
+        }
+
+        cout << "unalias " << args[1] << "\n\n";
     };
 }

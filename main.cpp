@@ -10,6 +10,7 @@
 #include "bb_util.h"
 #include "bb_exec.h"
 #include "bb_commands.h"
+#include "bb_aliases.h"
 #include "history.h"
 
 using namespace std;
@@ -29,6 +30,8 @@ int main() {
 
     historyInit(500);
     loadHistory(hist, 500);
+
+    (void)getAliases();
 
     std::string figlet = findCommand("figlet");
     std::string lolcat = findCommand("lolcat");
@@ -82,6 +85,21 @@ int main() {
 
         if (parts.empty()) continue;
 
+        parts = getAliases().expand_first_token(parts);
+
+        if (parts.empty()) continue;
+
+        auto joinParts = [&](const std::vector<std::string>& v) {
+            std::string out;
+
+            for (size_t i = 0; i < v.size(); i++) {
+                if (i) out += " ";
+                out += v[i];
+            }
+
+            return out;
+        };
+
         auto it = commands.find(parts[0]);
 
         if (it != commands.end()) {
@@ -94,7 +112,7 @@ int main() {
 
         cout << "\n";
 
-        cmd(line);
+        cmd(joinParts(parts));
 
         cout << "\n\n";
     }

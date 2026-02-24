@@ -1,5 +1,6 @@
 #include "bb_exec.h"
 #include "bb_util.h"
+#include "bb_aliases.h"
 
 #include <unistd.h>
 #include <sys/wait.h>
@@ -190,7 +191,9 @@ static int cmdPipeArgs(const std::vector<std::vector<std::string>>& parts) {
             argv.push_back(nullptr);
 
             execvp(argv[0], argv.data());
+            
             std::cerr << "exec failed: " << std::strerror(errno) << "\n";
+
             _exit(127);
         }
 
@@ -243,7 +246,10 @@ static int cmdPipeArgs(const std::vector<std::vector<std::string>>& parts) {
 
 static int cmdPipe(const std::string& line) {
     auto segs = splitPipes(line);
+
     if (segs.empty()) return 0;
+
+    (void)getAliases();
 
     std::vector<std::vector<std::string>> parts;
     parts.reserve(segs.size());
@@ -251,6 +257,11 @@ static int cmdPipe(const std::string& line) {
     for (auto& s : segs) {
         auto p = splitArgs(s);
         if (p.empty()) return -1;
+
+        p = getAliases().expand_first_token(p);
+
+        if (p.empty()) return -1;
+
         parts.push_back(std::move(p));
     }
 
@@ -304,7 +315,14 @@ int cmdArgs(const std::vector<std::string>& parts) {
 static int cmdOne(const std::string& line) {
     if (line.find('|') != std::string::npos) return cmdPipe(line);
 
+    (void)getAliases();
+
     auto parts = splitArgs(line);
+
+    if (parts.empty()) return 0;
+
+    parts = getAliases().expand_first_token(parts);
+
     if (parts.empty()) return 0;
 
     return cmdArgs(parts);

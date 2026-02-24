@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-g++ *.cpp -Iheader -o test
+g++ *.cpp -std=c++17 -Iheader -o test
 
 echo "Build successful. Starting..."
 sudo ./test

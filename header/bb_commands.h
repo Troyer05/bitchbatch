@@ -8,7 +8,11 @@
 
 using CommandMap = std::unordered_map<std::string, std::function<void(const std::vector<std::string>&)>>;
 
+enum class PkgMgr;
+
 void registerCommands(CommandMap& commands);
+
 std::string findCommand(const std::string& cmd);
+std::string mgrName(PkgMgr m);
 
 #endif
