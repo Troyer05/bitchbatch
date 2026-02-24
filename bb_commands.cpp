@@ -362,11 +362,25 @@ void registerCommands(CommandMap& commands) {
 
     commands["deploy"] = [&](const std::vector<std::string>& args) {
         if (args.size() < 2) {
-            cout << "Fergot commit message!\n\n";
+            cout << "Forgot commit message!\n\n";
             return;
         }
 
-        cmd("git add . && git commit -m \"" + args[1] + "\" && git push origin main");
+        std::string msg;
+
+        for (size_t i = 1; i < args.size(); i++) {
+            if (i > 1) msg += " ";
+            msg += args[i];
+        }
+
+        std::string safeMsg;
+        
+        for (char c : msg) {
+            if (c == '"') safeMsg += "\\\"";
+            else safeMsg += c;
+        }
+
+        cmd("git add . && git commit -m \"" + safeMsg + "\" && git push origin main");
 
         cout << "\n";
     };
