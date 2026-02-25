@@ -11,6 +11,7 @@ namespace Color {
     const std::string YELLOW= "\033[33m";
     const std::string BLUE  = "\033[34m";
     const std::string CYAN  = "\033[36m";
+    const std::string GRAY  = "\033[37m";
 }
 
 std::string getVersion() {

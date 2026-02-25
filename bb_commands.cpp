@@ -8,6 +8,7 @@
 #include "bb_aliases.h"
 #include "history.h"
 #include "pkg.h"
+#include "tutorial.h"
 
 #include <unistd.h>
 #include <cerrno>
@@ -181,6 +182,10 @@ void registerCommands(CommandMap& commands) {
     commands["disk"] = [&](const std::vector<std::string>&) {
         cmd("df -h");
         cout << "\n";
+    };
+
+    commands["learn-linux-terminal"] = [&](const std::vector<std::string>&) {
+        learnLinuxTerminal();
     };
 
     commands["info"] = commands["credits"] = [&](const std::vector<std::string>&) {
