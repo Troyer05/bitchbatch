@@ -58,6 +58,7 @@ g++ *.cpp -Iheader -O2 -o biba
 
 # install
 sudo install -m 0755 biba /usr/local/bin/biba
+sudo install -m 0755 biba /sbin/biba
 
 clear
 echo "Bitch Batch installiert - starte mit: biba"
