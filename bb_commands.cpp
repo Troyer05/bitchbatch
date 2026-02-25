@@ -173,11 +173,6 @@ void registerCommands(CommandMap& commands) {
         cout << "\n";
     };
 
-    commands["ip"] = [&](const std::vector<std::string>&) {
-        cmd("ip a");
-        cout << "\n";
-    };
-
     commands["mem"] = [&](const std::vector<std::string>&) {
         cmd("free -h");
         cout << "\n";
@@ -368,6 +363,19 @@ void registerCommands(CommandMap& commands) {
         }
 
         std::vector<std::string> p = {"sudo", "systemctl", "start"};
+        for (size_t i = 1; i < args.size(); i++) p.push_back(args[i]);
+
+        cmdArgs(p);
+        cout << "\n";
+    };
+
+    commands["ip"] = [&](const std::vector<std::string>& args) {
+        if (args.size() < 2) {
+            cmd("ip a");
+            return;
+        }
+
+        std::vector<std::string> p = {"ip"};
         for (size_t i = 1; i < args.size(); i++) p.push_back(args[i]);
 
         cmdArgs(p);
