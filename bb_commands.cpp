@@ -107,22 +107,26 @@ void registerCommands(CommandMap& commands) {
     static const PkgMgr PM = detectPkgMgr();
 
     commands["update-biba"] = [&](const std::vector<std::string>&) {
-        cmd("sudo rm -r bitchbatch");
-        cmd("sudo rm /usr/local/bin/biba");
-        cmd("sudo rm /sbin/biba");
+        cout << "Updating Biba...\n\n";
+
+        cmd("rm -rf bitchbatch 2>/dev/null");
         cmd("git clone https://github.com/Troyer05/bitchbatch.git");
-        cmd("sudo chmod +x bitchbatch/install.sh");
-        cmd("sudo bash bitchbatch/install.sh");
-        cmd("sudo cp bitchbatch/biba /usr/local/bin/biba");
-        cmd("sudo cp bitchbatch/biba /usr/sbin/biba");
-        cmd("sudo cp bitchbatch/biba /sbin/biba");
+
+        if (system("test -d bitchbatch") != 0) {
+            cout << "Clone failed.\n";
+            return;
+        }
+
+        cmd("chmod +x bitchbatch/install.sh");
+        cmd("bash bitchbatch/install.sh");
+        cmd("sudo install -m 755 bitchbatch/biba /usr/local/bin/biba");
 
         cout << "\nUpdate finished. Restarting...\n\n";
 
-        char* argv[] = { (char*)"biba", nullptr };
+        execl("/usr/local/bin/biba", "biba", nullptr);
 
-        execvp(argv[0], argv);
-        perror("execvp");
+        perror("exec failed");
+        
         exit(1);
     };
 
