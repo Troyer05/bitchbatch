@@ -110,6 +110,9 @@ void registerCommands(CommandMap& commands) {
         cout << "Updating Biba...\n\n";
 
         cmd("rm -rf bitchbatch 2>/dev/null");
+        cmd("rm /sbin/biba 2>/dev/null");
+        cmd("rm /usr/local/bin/biba 2>/dev/null");
+
         cmd("git clone https://github.com/Troyer05/bitchbatch.git");
 
         if (system("test -d bitchbatch") != 0) {
@@ -118,8 +121,9 @@ void registerCommands(CommandMap& commands) {
         }
 
         cmd("chmod +x bitchbatch/install.sh");
-        cmd("bash bitchbatch/install.sh");
+        cmd("g++ bitchbatch/*.cpp -Iheader -o bitchbatch/biba");
         cmd("sudo install -m 755 bitchbatch/biba /usr/local/bin/biba");
+        cmd("sudo install -m 755 bitchbatch/biba /sbin/biba");
 
         cout << "\nUpdate finished. Restarting...\n\n";
 
