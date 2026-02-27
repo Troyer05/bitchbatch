@@ -70,6 +70,7 @@ void basicHelp(PkgMgr pm) {
     cout << "cl [path]              Open ranger (default: .)\n";
     cout << "e <file...>            Open nano (sudo)\n";
     cout << "v [file...]            Open vim\n";
+    cout << "vsc <path>             Opens VSCode on path - without path given, the actual dir is gonna be opened\n";
     cout << "me [path]              Open mcedit (default: .)\n\n";
 
     cout << "System / Network\n";

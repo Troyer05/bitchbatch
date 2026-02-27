@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <signal.h>
+#include <locale.h>
 
 #include "framework.h"
 #include "bb_types.h"
@@ -10,6 +11,7 @@
 #include "bb_util.h"
 #include "bb_exec.h"
 #include "bb_commands.h"
+#include "bb_prompt.h"
 #include "bb_aliases.h"
 #include "history.h"
 
@@ -23,6 +25,7 @@ static void onSigInt(int) {
 }
 
 int main() {
+    setlocale(LC_ALL, "");
     signal(SIGINT, onSigInt);
     signal(SIGQUIT, SIG_IGN);
 
@@ -54,7 +57,11 @@ int main() {
     }
 
     cout << Color::YELLOW
-         << "If you run this the first time, please type   init    and hit enter. Then restart Bitch Batch\n\n"
+         << "If you run this the first time, please type   init    and hit enter. Then restart Bitch Batch\n"
+         << Color::CYAN
+         << "If you are new to Linux, type learn-linux-terminal and hit enter - to enter a small linux tutorial\n"
+         << Color::GREEN
+         << "Thanks for using BITCHBATCH :)\n\n"
          << Color::RESET;
 
     CommandMap commands;
@@ -65,15 +72,7 @@ int main() {
         const std::string host = getHost();
         const std::string cwd  = prettyPath(getCwd(), user);
 
-        std::string prompt =
-            Color::GREEN + user +
-            Color::BLUE + " @ " +
-            Color::RED + host +
-            Color::CYAN + " : " +
-            Color::CYAN + cwd +
-            Color::RESET + "\n" +
-            Color::YELLOW + "> " +
-            Color::RESET;
+        std::string prompt = makeBibaPrompt(user, host, cwd);
 
         std::string line = readLineNice(prompt, commands, historyVec());
 

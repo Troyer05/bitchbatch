@@ -10,6 +10,9 @@ namespace Color {
     extern const std::string YELLOW;
     extern const std::string BLUE;
     extern const std::string CYAN;
+    extern const std::string MAGENTA;
+    extern const std::string ORANGE;
+    extern const std::string PINK;
     extern const std::string GRAY;
 }
 

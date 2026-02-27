@@ -8,10 +8,13 @@
 #include <algorithm>
 #include <limits.h>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
+#include <cwchar>
+#include <clocale>
 
 static bool readByteTimeout(unsigned char& c, int timeoutMs) {
     fd_set set;
@@ -37,28 +40,67 @@ static int termCols() {
     return 80;
 }
 
-static int visibleLenAnsi(const std::string& s) {
-    int n = 0;
+static int widthUtf8Prefix(const std::string& s, size_t bytes) {
+    std::mbstate_t st{};
+    int w = 0;
+    const char* p = s.data();
+    size_t n = std::min(bytes, s.size());
+    size_t i = 0;
+
+    while (i < n) {
+        wchar_t wc{};
+        size_t r = std::mbrtowc(&wc, p + i, n - i, &st);
+
+        if (r == (size_t)-2) break;
+        if (r == (size_t)-1) {
+            std::memset(&st, 0, sizeof(st));
+            w += 1;
+            i += 1;
+            continue;
+        }
+
+        if (r == 0) break;
+
+        int cw = ::wcwidth(wc);
+        if (cw < 0) cw = 1;
+
+        w += cw;
+        i += r;
+    }
+
+    return w;
+}
+
+static int widthUtf8(const std::string& s) {
+    return widthUtf8Prefix(s, s.size());
+}
+
+static int widthAnsi(const std::string& s) {
+    int w = 0;
 
     for (size_t i = 0; i < s.size();) {
         unsigned char c = (unsigned char)s[i];
 
         if (c == 0x1B && i + 1 < s.size() && s[i + 1] == '[') {
             i += 2;
-
             while (i < s.size()) {
                 unsigned char x = (unsigned char)s[i++];
                 if (x >= 0x40 && x <= 0x7E) break;
             }
-
             continue;
         }
 
-        n++;
-        i++;
+        size_t start = i;
+        while (i < s.size()) {
+            unsigned char x = (unsigned char)s[i];
+            if (x == 0x1B && i + 1 < s.size() && s[i + 1] == '[') break;
+            i++;
+        }
+
+        w += widthUtf8Prefix(s.substr(start, i - start), i - start);
     }
 
-    return n;
+    return w;
 }
 
 static std::vector<std::string> splitLines(const std::string& s) {
@@ -86,15 +128,17 @@ static void redraw(const std::string& prompt, const std::string& buf, size_t cur
     auto plines = splitLines(prompt);
 
     const int promptLines = (int)plines.size();
-    const int promptLastVis = visibleLenAnsi(plines.empty() ? "" : plines.back());
-    const int inputTotal = promptLastVis + (int)buf.size();
+    const int promptLastVis = widthAnsi(plines.empty() ? "" : plines.back());
+    const int bufVis = widthUtf8(buf);
+    const int inputTotal = promptLastVis + bufVis;
     const int inputLines = (inputTotal / cols) + 1;
 
     int totalLinesNow = (promptLines - 1) + inputLines;
 
     if (totalLinesNow < 1) totalLinesNow = 1;
 
-    const int cursorPos = promptLastVis + (int)cur;
+    const int bufVisCur = widthUtf8Prefix(buf, cur);
+    const int cursorPos = promptLastVis + bufVisCur;
     const int curLine = cursorPos / cols;
     const int curCol  = cursorPos % cols;
 
@@ -111,7 +155,7 @@ static void redraw(const std::string& prompt, const std::string& buf, size_t cur
 
     std::cout << "\r" << prompt << buf;
 
-    const int endPos  = promptLastVis + (int)buf.size();
+    const int endPos  = promptLastVis + bufVis;
     const int endLine = endPos / cols;
     const int endCol  = endPos % cols;
     const int up = endLine - curLine;

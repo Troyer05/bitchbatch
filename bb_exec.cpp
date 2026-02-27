@@ -11,6 +11,12 @@
 #include <vector>
 #include <signal.h>
 
+static int g_lastStatus = 0;
+
+int lastCmdStatus() {
+    return g_lastStatus;
+}
+
 static std::string trim(const std::string& s) {
     size_t a = 0;
 
@@ -269,7 +275,10 @@ static int cmdPipe(const std::string& line) {
 }
 
 int cmdArgs(const std::vector<std::string>& parts) {
-    if (parts.empty()) return 0;
+    if (parts.empty()) {
+        g_lastStatus = 0;
+        return 0;
+    }
 
     std::vector<char*> argv;
     argv.reserve(parts.size() + 1);
@@ -292,7 +301,8 @@ int cmdArgs(const std::vector<std::string>& parts) {
 
     if (pid < 0) {
         std::cerr << "fork failed: " << std::strerror(errno) << "\n";
-        return -1;
+        g_lastStatus = -1;
+        return g_lastStatus;
     }
 
     int status = 0;
@@ -301,15 +311,20 @@ int cmdArgs(const std::vector<std::string>& parts) {
         if (waitpid(pid, &status, 0) < 0) {
             if (errno == EINTR) continue;
             std::cerr << "waitpid failed: " << std::strerror(errno) << "\n";
-            return -1;
+            g_lastStatus = -1;
+            return g_lastStatus;
         }
 
         break;
     }
 
-    if (WIFEXITED(status)) return WEXITSTATUS(status);
+    if (WIFEXITED(status)) {
+        g_lastStatus = WEXITSTATUS(status);
+        return g_lastStatus;
+    }
 
-    return -1;
+    g_lastStatus = -1;
+    return g_lastStatus;
 }
 
 static int cmdOne(const std::string& line) {
@@ -342,8 +357,10 @@ static int cmdChain(const std::string& line) {
 
 int cmd(const std::string& line) {
     if (line.find(';') != std::string::npos || line.find("&&") != std::string::npos) {
-        return cmdChain(line);
+        g_lastStatus = cmdChain(line);
+        return g_lastStatus;
     }
 
-    return cmdOne(trim(line));
+    g_lastStatus = cmdOne(trim(line));
+    return g_lastStatus;
 }

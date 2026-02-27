@@ -177,10 +177,6 @@ struct Chapter {
     std::vector<Step> steps;
 };
 
-
-
-
-
 static Step Text(string title, std::vector<string> lines, RunMode mode = RunMode::SHELL) {
     Step s{};
 
@@ -311,10 +307,6 @@ static void seedSandbox() {
     writeFile(root / ".secret",
               "shh. hidden files start with a dot.\n");
 }
-
-
-
-
 
 static bool isBannedCommand(const string& raw, string& reason) {
     string s = trim(raw);
