@@ -41,15 +41,19 @@ static bool fileExists(const std::string& p) {
 
 static void backupFile(const std::string& p) {
     if (!fileExists(p)) return;
+
     std::string b = p + ".biba.bak";
     std::error_code ec;
+
     fs::copy_file(p, b, fs::copy_options::overwrite_existing, ec);
 }
 
 static std::string readAll(const std::string& p) {
     std::ifstream f(p);
     std::ostringstream ss;
+
     ss << f.rdbuf();
+
     return ss.str();
 }
 
@@ -60,9 +64,12 @@ static void writeAll(const std::string& p, const std::string& s) {
 
 static void ensureLineInFile(const std::string& p, const std::string& line) {
     std::string c = fileExists(p) ? readAll(p) : "";
+
     if (c.find(line) != std::string::npos) return;
     if (!c.empty() && c.back() != '\n') c.push_back('\n');
+
     c += line + "\n";
+
     writeAll(p, c);
 }
 
@@ -71,6 +78,7 @@ static void setZshKey(const std::string& p, const std::string& key, const std::s
     std::istringstream in(c);
     std::ostringstream out;
     std::string line;
+
     bool done = false;
 
     while (std::getline(in, line)) {
@@ -81,31 +89,38 @@ static void setZshKey(const std::string& p, const std::string& key, const std::s
             out << line << "\n";
         }
     }
+
     if (!done) out << key << "=" << valueQuoted << "\n";
+
     writeAll(p, out.str());
 }
 
 static std::vector<std::string> splitWords(const std::string& s) {
     std::istringstream iss(s);
     std::vector<std::string> v;
+
     for (std::string w; iss >> w; ) v.push_back(w);
+
     return v;
 }
 
 static std::string joinWords(const std::vector<std::string>& v) {
     std::ostringstream oss;
+
     for (size_t i=0;i<v.size();++i) {
         if (i) oss << " ";
         oss << v[i];
     }
+
     return oss.str();
 }
 
 static std::vector<std::string> parsePluginsLine(const std::string& line) {
-    // expects plugins=(a b c)
     auto l = line.find('(');
     auto r = line.find(')', l == std::string::npos ? 0 : l);
+
     if (l == std::string::npos || r == std::string::npos || r <= l) return {};
+
     return splitWords(line.substr(l+1, r-l-1));
 }
 
@@ -114,6 +129,7 @@ static void setPlugins(const std::string& p, const std::vector<std::string>& plu
     std::istringstream in(c);
     std::ostringstream out;
     std::string line;
+
     bool done = false;
 
     std::vector<std::string> finalPlugins = plugins;
@@ -122,13 +138,16 @@ static void setPlugins(const std::string& p, const std::vector<std::string>& plu
         if (line.rfind("plugins=(", 0) == 0) {
             if (merge) {
                 auto cur = parsePluginsLine(line);
+
                 for (auto &pl : plugins) {
                     bool exists = false;
                     for (auto &x : cur) if (x == pl) { exists = true; break; }
                     if (!exists) cur.push_back(pl);
                 }
+
                 finalPlugins = cur;
             }
+
             out << "plugins=(" << joinWords(finalPlugins) << ")\n";
             done = true;
         } else {
@@ -137,6 +156,7 @@ static void setPlugins(const std::string& p, const std::vector<std::string>& plu
     }
 
     if (!done) out << "plugins=(" << joinWords(finalPlugins) << ")\n";
+
     writeAll(p, out.str());
 }
 
@@ -151,31 +171,40 @@ static inline std::string trimLocal(std::string s) {
 
 static std::string cfgGet(const std::string& cfg, const std::string& key, const std::string& def) {
     if (!fileExists(cfg)) return def;
+
     std::istringstream in(readAll(cfg));
     std::string line;
+
     while (std::getline(in, line)) {
         auto t = trimLocal(line);
+
         if (t.empty()) continue;
         if (t.rfind(key + "=", 0) == 0) return trimLocal(t.substr(key.size() + 1));
     }
+
     return def;
 }
 
 
 static void removeLinesContaining(const std::string& p, const std::string& needle) {
     if (!fileExists(p)) return;
+
     std::string c = readAll(p);
     std::istringstream in(c);
     std::ostringstream out;
     std::string line;
+
     bool changed = false;
+
     while (std::getline(in, line)) {
         if (line.find(needle) != std::string::npos) {
             changed = true;
             continue;
         }
+
         out << line << "\n";
     }
+
     if (changed) writeAll(p, out.str());
 }
 
@@ -188,6 +217,7 @@ static void writeIfDifferent(const std::string& p, const std::string& s) {
     if (fileExists(p)) {
         if (readAll(p) == s) return;
     }
+
     writeAll(p, s);
 }
 
@@ -196,9 +226,12 @@ static void setCfgKey(const std::string& p, const std::string& key, const std::s
     std::istringstream in(c);
     std::ostringstream out;
     std::string line;
+
     bool done = false;
+
     while (std::getline(in, line)) {
         auto t = trimLocal(line);
+
         if (t.rfind(key + "=", 0) == 0) {
             out << key << "=" << value << "\n";
             done = true;
@@ -206,7 +239,9 @@ static void setCfgKey(const std::string& p, const std::string& key, const std::s
             if (!t.empty()) out << t << "\n";
         }
     }
+
     if (!done) out << key << "=" << value << "\n";
+
     writeAll(p, out.str());
 }
 
@@ -216,33 +251,46 @@ static void setCfgModules(const std::string& p, const std::vector<std::string>& 
     std::istringstream in(c);
     std::ostringstream out;
     std::string line;
+
     bool have = false;
+
     while (std::getline(in, line)) {
         auto t = trimLocal(line);
+
         if (t.rfind("MODULES=", 0) == 0) {
             cur = t.substr(std::string("MODULES=").size());
             have = true;
             continue;
         }
+
         if (t.rfind("THEME=", 0) == 0) out << t << "\n";
     }
+
     std::vector<std::string> finalMods = modules;
+
     if (merge && have) {
         auto curMods = splitWords(cur);
+
         for (auto &m : modules) {
             bool ex = false;
             for (auto &x : curMods) if (x == m) { ex = true; break; }
             if (!ex) curMods.push_back(m);
         }
+
         finalMods = curMods;
     }
+
     out << "MODULES=" << joinWords(finalMods) << "\n";
+
     if (!fileExists(p) || readAll(p).find("THEME=") == std::string::npos) {
         if (out.str().find("THEME=") == std::string::npos) {
         }
     }
+
     std::string outStr = out.str();
+
     if (outStr.find("THEME=") == std::string::npos) outStr = std::string("THEME=neon\n") + outStr;
+
     writeAll(p, outStr);
 }
 
@@ -1209,6 +1257,7 @@ commands["bashrc"] = [&](const std::vector<std::string>& args) {
         ensureLineInFile(bashrc, "source \"$HOME/.biba-bash/biba.sh\"");
 
         std::cout << "Bash customization installed.\n";
+
         return;
     }
 
@@ -1234,6 +1283,7 @@ commands["bashrc"] = [&](const std::vector<std::string>& args) {
     };
 
     mode = normMode(mode);
+
     if (curStyle != "multiline" && curStyle != "single") curStyle = "multiline";
     if (curShowHost != "1" && curShowHost != "0") curShowHost = "1";
     if (curSep.empty()) curSep = "│";
@@ -1245,8 +1295,7 @@ commands["bashrc"] = [&](const std::vector<std::string>& args) {
         std::string h = getHost();
         std::string p = prettyPath(getCwd(), u);
 
-        std::vector<std::string> ms;
-        {
+        std::vector<std::string> ms; {
             std::istringstream iss(mods);
             for (std::string w; iss >> w; ) ms.push_back(w);
         }
@@ -1259,18 +1308,20 @@ commands["bashrc"] = [&](const std::vector<std::string>& args) {
             int bgOk   = 34;
             int bgBad  = 160;
             int bgSym  = 236;
-
             int fgDark = 16;
             int fgLight = 15;
 
             std::string tUser = u;
-            if (sh != "0") tUser += " @ " + h;
-            std::string tPath = p;
 
+            if (sh != "0") tUser += " @ " + h;
+
+            std::string tPath = p;
             std::string br = "main";
+
             int st = 0;
 
             std::string line1;
+
             int curBg = -1;
 
             auto escFg = [&](int c){ return std::string("\033[38;5;") + std::to_string(c) + "m"; };
@@ -1292,7 +1343,6 @@ commands["bashrc"] = [&](const std::vector<std::string>& args) {
 
             line1 += plStart(fgLight, bgUser, tUser);
             curBg = bgUser;
-
             line1 += plSep(curBg, bgPath);
             line1 += plStart(fgLight, bgPath, tPath);
             curBg = bgPath;
@@ -1305,6 +1355,7 @@ commands["bashrc"] = [&](const std::vector<std::string>& args) {
                 } else if (x == "status") {
                     int bgS = (st == 0) ? bgOk : bgBad;
                     int fgS = (st == 0) ? fgDark : fgLight;
+
                     line1 += plSep(curBg, bgS);
                     line1 += plStart(fgS, bgS, (st == 0) ? "OK" : std::to_string(st));
                     curBg = bgS;
@@ -1318,11 +1369,14 @@ commands["bashrc"] = [&](const std::vector<std::string>& args) {
             line1 += plEnd(curBg);
 
             std::string line2;
+
             line2 += Color::GREEN + "└─" + Color::RESET;
             line2 += escFg(208) + escBg(bgSym) + " " + sym + " ";
             line2 += escFg(bgSym) + "\033[49m\033[0m ";
+
             if (style == "single") std::cout << line1 << " " << line2 << "\n\n";
             else std::cout << line1 << "\n" << line2 << "\n\n";
+
             return;
         }
 
@@ -1330,10 +1384,12 @@ commands["bashrc"] = [&](const std::vector<std::string>& args) {
             std::string line1;
             line1 += Color::GREEN + "┌─" + Color::RESET;
             line1 += Color::GREEN + u + Color::RESET;
+
             if (sh != "0") {
                 line1 += " " + Color::BLUE + "@" + Color::RESET;
                 line1 += " " + Color::RED + h + Color::RESET;
             }
+
             line1 += " " + Color::CYAN + p + Color::RESET;
 
             for (auto &x : ms) {
@@ -1350,17 +1406,21 @@ commands["bashrc"] = [&](const std::vector<std::string>& args) {
             }
 
             std::string line2 = Color::GREEN + "└─" + Color::RESET + Color::ORANGE + sym + Color::RESET + " ";
+
             if (style == "single") std::cout << line1 << " " << line2 << "\n\n";
             else std::cout << line1 << "\n" << line2 << "\n\n";
+
             return;
         }
 
         std::string line1;
         line1 += Color::GREEN + u + Color::RESET;
+
         if (sh != "0") {
             line1 += " " + Color::BLUE + "@" + Color::RESET;
             line1 += " " + Color::RED + h + Color::RESET;
         }
+
         line1 += " " + Color::CYAN + p + Color::RESET;
 
         for (auto &x : ms) {
@@ -1370,6 +1430,7 @@ commands["bashrc"] = [&](const std::vector<std::string>& args) {
         }
 
         std::string line2 = Color::ORANGE + sym + Color::RESET + " ";
+
         if (style == "single") std::cout << line1 << " " << line2 << "\n\n";
         else std::cout << line1 << "\n" << line2 << "\n\n";
     };
@@ -1377,13 +1438,16 @@ commands["bashrc"] = [&](const std::vector<std::string>& args) {
     
 termios old{};
 termios raw{};
+
 bool rawOk = false;
 
 if (tcgetattr(STDIN_FILENO, &old) == 0) {
     raw = old;
+
     raw.c_lflag &= ~(ICANON | ECHO);
     raw.c_cc[VMIN] = 1;
     raw.c_cc[VTIME] = 0;
+
     rawOk = (tcsetattr(STDIN_FILENO, TCSANOW, &raw) == 0);
 }
 
@@ -1397,12 +1461,17 @@ auto enableRaw = [&](){
 
 auto readKey = [&](){
         unsigned char c = 0;
+
         if (read(STDIN_FILENO, &c, 1) != 1) return std::string();
         if (c != 0x1B) return std::string(1, (char)c);
+
         unsigned char a = 0;
+
         if (read(STDIN_FILENO, &a, 1) != 1) return std::string("\x1b");
         if (a != '[') return std::string("\x1b") + (char)a;
+
         unsigned char b = 0;
+
         if (read(STDIN_FILENO, &b, 1) != 1) return std::string("\x1b[");
         return std::string("\x1b[") + (char)b;
     };
@@ -1415,11 +1484,16 @@ auto readKey = [&](){
 
     auto cycle = [&](const std::vector<std::string>& list, const std::string& cur, int dir){
         if (list.empty()) return cur;
+
         int idx = 0;
+
         for (int i = 0; i < (int)list.size(); i++) if (list[i] == cur) { idx = i; break; }
+
         idx += dir;
+
         if (idx < 0) idx = (int)list.size() - 1;
         if (idx >= (int)list.size()) idx = 0;
+
         return list[idx];
     };
 
@@ -1427,14 +1501,18 @@ auto readKey = [&](){
 
     auto draw = [&](){
         CLS();
+
         std::cout << "Biba Wizard (↑↓ move, ←→ change, Enter edit, s save, q abort)\n\n";
+
         renderPreview(mode, curStyle, curSymbol, curShowHost, curSep, curModules);
 
         auto row = [&](int i, const std::string& k, const std::string& v){
             if (sel == i) std::cout << "\033[7m";
             std::cout << (i+1) << ") " << k;
+
             if (k.size() < 10) std::cout << std::string(10 - k.size(), ' ');
             std::cout << ": " << v;
+            
             if (sel == i) std::cout << "\033[0m";
             std::cout << "\n";
         };
@@ -1461,9 +1539,11 @@ auto readKey = [&](){
         draw();
 
         auto k = readKey();
+
         if (k.empty()) continue;
 
         if (k == "q") { std::cout << "Aborted.\n"; restoreTerm(); return; }
+
         if (k == "s") {
             setCfgKey(cfg, "MODE", mode);
             setCfgKey(cfg, "THEME", curTheme);
@@ -1472,8 +1552,11 @@ auto readKey = [&](){
             setCfgKey(cfg, "SHOW_HOST", curShowHost);
             setCfgKey(cfg, "SEP", curSep);
             setCfgKey(cfg, "MODULES", trimLocal(curModules));
+
             std::cout << "Saved.\n";
+
             restoreTerm();
+
             return;
         }
 
@@ -1496,6 +1579,7 @@ auto readKey = [&](){
             else if (sel == 3) curShowHost = (curShowHost == "1") ? "0" : "1";
             else if (sel == 4) curModules = cycle(modPresets, curModules, -1);
             else if (sel == 5) curSep = cycle(seps, curSep, -1);
+
             continue;
         }
 
@@ -1506,6 +1590,7 @@ auto readKey = [&](){
             else if (sel == 3) curShowHost = (curShowHost == "1") ? "0" : "1";
             else if (sel == 4) curModules = cycle(modPresets, curModules, +1);
             else if (sel == 5) curSep = cycle(seps, curSep, +1);
+
             continue;
         }
 
@@ -1513,40 +1598,57 @@ auto readKey = [&](){
             if (sel == 2) {
                 restoreTerm();
                 CLS();
+
                 std::cout << "symbol presets: >  $  ➜  ❯  ⚡\n";
                 std::cout << "symbol: ";
                 std::string a;
                 std::getline(std::cin, a);
+
                 a = trimLocal(a);
+
                 if (!a.empty()) curSymbol = a;
+
                 restoreTerm();
+
                 continue;
             }
 
             if (sel == 4) {
                 restoreTerm();
                 CLS();
+
                 std::cout << "modules presets:\n";
+
                 for (size_t i=0;i<modPresets.size();++i) std::cout << "  " << (i+1) << ") " << modPresets[i] << "\n";
+
                 std::cout << "\nmodules: ";
                 std::string a;
                 std::getline(std::cin, a);
+
                 a = trimLocal(a);
+
                 if (!a.empty()) curModules = a;
+
                 restoreTerm();
+
                 continue;
             }
 
             if (sel == 5) {
                 restoreTerm();
                 CLS();
+
                 std::cout << "sep presets: │  ·  •  /  >\n";
                 std::cout << "sep: ";
                 std::string a;
                 std::getline(std::cin, a);
+
                 a = trimLocal(a);
+
                 if (!a.empty()) curSep = a;
+
                 restoreTerm();
+
                 continue;
             }
 
@@ -1558,7 +1660,9 @@ auto readKey = [&](){
                 setCfgKey(cfg, "SHOW_HOST", curShowHost);
                 setCfgKey(cfg, "SEP", curSep);
                 setCfgKey(cfg, "MODULES", trimLocal(curModules));
+
                 std::cout << "Saved.\n";
+
                 return;
             }
 
@@ -1636,19 +1740,20 @@ commands["zsh"] = [&](const std::vector<std::string>& args) {
 
     const std::string sub = args[1];
 
-    // immer backup bevor wir anfassen
     backupFile(zshrc);
 
     if (sub == "install") {
         cmd("sudo apt-get update -y");
         cmd("sudo apt-get install -y zsh curl git");
-        // oh-my-zsh non-interactive (RUNZSH=no, CHSH=no)
+
         if (!fileExists(ohmyzshDir)) {
             cmd("RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c \"$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)\"");
         } else {
             std::cout << "Oh My Zsh already installed.\n";
         }
+
         std::cout << "Install done.\n";
+
         return;
     }
 
