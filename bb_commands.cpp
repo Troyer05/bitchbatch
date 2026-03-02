@@ -29,6 +29,11 @@
 using namespace std;
 namespace fs = std::filesystem;
 
+static int sh(const std::string& s) {
+    std::string cmd = "bash -lc '" + s + "'";
+    return std::system(cmd.c_str());
+}
+
 static std::string homeDir() {
     const char* h = std::getenv("HOME");
     return h ? std::string(h) : std::string("/root");
@@ -611,31 +616,52 @@ void registerCommands(CommandMap& commands) {
     static const PkgMgr PM = detectPkgMgr();
 
     commands["update-biba"] = [&](const std::vector<std::string>&) {
-        cout << "Updating Biba...\n\n";
+        std::cout << "Updating Biba...\n\n";
 
-        cmd("rm -rf bitchbatch 2>/dev/null");
-        cmd("rm /sbin/biba 2>/dev/null");
-        cmd("rm /usr/local/bin/biba 2>/dev/null");
+        sh("rm -rf bitchbatch 2>/dev/null || true");
+        sh("rm -f /sbin/biba /usr/local/bin/biba 2>/dev/null || true");
 
-        cmd("git clone https://github.com/Troyer05/bitchbatch.git");
-
-        if (system("test -d bitchbatch") != 0) {
-            cout << "Clone failed.\n";
+        if (sh("git clone https://github.com/Troyer05/bitchbatch.git") != 0) {
+            std::cout << "Clone failed.\n";
             return;
         }
 
-        cmd("chmod +x bitchbatch/install.sh");
-        cmd("g++ bitchbatch/*.cpp -Iheader -o bitchbatch/biba");
-        cmd("sudo install -m 755 bitchbatch/biba /usr/local/bin/biba");
-        cmd("sudo install -m 755 bitchbatch/biba /sbin/biba");
+        if (sh("test -d bitchbatch") != 0) {
+            std::cout << "Clone folder missing.\n";
+            return;
+        }
 
-        cout << "\nUpdate finished. Restarting...\n\n";
+        if (sh("chmod +x bitchbatch/install.sh") != 0) {
+            std::cout << "chmod failed.\n";
+            return;
+        }
 
-        execl("/usr/local/bin/biba", "biba", nullptr);
+        if (sh("g++ -std=c++17 bitchbatch/*.cpp -Ibitchbatch/header -o bitchbatch/biba") != 0) {
+            std::cout << "Build failed.\n";
+            return;
+        }
 
+        if (sh("install -m 755 bitchbatch/biba /usr/local/bin/biba") != 0) {
+            std::cout << "Install to /usr/local/bin failed.\n";
+            return;
+        }
+
+        if (sh("install -m 755 bitchbatch/biba /sbin/biba") != 0) {
+            std::cout << "Install to /sbin failed.\n";
+            return;
+        }
+
+        if (access("/usr/local/bin/biba", X_OK) != 0) {
+            std::cout << "Installed binary not found/executable.\n";
+            return;
+        }
+
+        std::cout << "\nUpdate finished. Restarting...\n\n";
+
+        execl("/usr/local/bin/biba", "biba", (char*)nullptr);
         perror("exec failed");
-        
-        exit(1);
+
+        std::exit(1);
     };
 
     commands["c"] = commands["cls"] = commands["clear"] = [&](const std::vector<std::string>&) {
