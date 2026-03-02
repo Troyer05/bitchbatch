@@ -60,5 +60,11 @@ g++ *.cpp -Iheader -O2 -o biba
 sudo install -m 0755 biba /usr/local/bin/biba
 sudo install -m 0755 biba /sbin/biba
 
+if [ -f "assets/fonts/Monocraft.ttc" ]; then
+  sudo mkdir -p /usr/local/share/fonts/bitchbatch
+  sudo cp -f "assets/fonts/Monocraft.ttc" /usr/local/share/fonts/bitchbatch/Monocraft.ttc
+  fc-cache -f >/dev/null 2>&1 || true
+fi
+
 clear
 echo "Bitch Batch installiert - starte mit: biba"

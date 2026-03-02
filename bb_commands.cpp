@@ -6,6 +6,7 @@
 #include "bb_env.h"
 #include "bb_help.h"
 #include "bb_aliases.h"
+#include "bb_mcfont.h"
 #include "history.h"
 #include "pkg.h"
 #include "tutorial.h"
@@ -668,6 +669,10 @@ void registerCommands(CommandMap& commands) {
         CLS();
     };
 
+    commands["hacking"] = [&](const std::vector<std::string>&) {
+        cmd("cmatrix");
+    };
+
     commands["exut"] = commands["exit"] = [&](const std::vector<std::string>&) {
         exit(0);
     };
@@ -712,8 +717,12 @@ void registerCommands(CommandMap& commands) {
         cout << "\n";
     };
 
-    commands["learn-linux-terminal"] = [&](const std::vector<std::string>&) {
+    commands["tutorial"] = commands["learn-linux-terminal"] = [&](const std::vector<std::string>&) {
         learnLinuxTerminal();
+    };
+
+    commands["mcfont"] = [&](const std::vector<std::string>& args) {
+        mcfontRun(args);
     };
 
     commands["info"] = commands["credits"] = [&](const std::vector<std::string>&) {

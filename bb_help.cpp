@@ -116,6 +116,11 @@ void basicHelp(PkgMgr pm) {
     cout << "--------------------------------------------------------------------\n";
     cout << "update-biba           Update from GitHub and restart\n\n";
 
+    cout << "Style\n";
+    cout << "--------------------------------------------------------------------\n";
+    cout << "mcfont                Switch terminal to Monocraft (best effort)\n";
+    cout << "mcfont -no            Back to default monospace\n\n";
+
     cout << "Development\n";
     cout << "--------------------------------------------------------------------\n";
     cout << "deploy <msg>          Deploys on github with provided commit message\n";
@@ -200,6 +205,25 @@ void helpFor(const std::string& command, PkgMgr pm) {
 
         cout << "Usage:\n  info\n  credits\n\n";
         cout << "Description:\n  Prints version and credits.\n";
+
+        return;
+    }
+
+    if (c == "mcfont") {
+        printHdr("mcfont");
+
+        cout << "Usage:\n";
+        cout << "  mcfont\n";
+        cout << "  mcfont -no\n\n";
+
+        cout << "Description:\n";
+        cout << "  Tries to switch your terminal font to Monocraft.\n";
+        cout << "  Works by editing terminal config files (depends on environment).\n\n";
+
+        cout << "Notes:\n";
+        cout << "  - Windows Terminal needs Monocraft installed on Windows host too.\n";
+        cout << "  - Restart the terminal after changing.\n";
+        cout << "  - State is stored in ~/.config/bitchbatch/mcfont\n";
 
         return;
     }

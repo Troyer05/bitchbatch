@@ -14,6 +14,7 @@
 #include "bb_prompt.h"
 #include "bb_aliases.h"
 #include "history.h"
+#include "bb_mcfont.h"
 
 using namespace std;
 
@@ -66,6 +67,8 @@ int main() {
 
     CommandMap commands;
     registerCommands(commands);
+
+    mcfontApplySaved();
 
     while (true) {
         const std::string user = getUser();
