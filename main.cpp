@@ -73,7 +73,6 @@ int main() {
         const std::string cwd  = prettyPath(getCwd(), user);
 
         std::string prompt = makeBibaPrompt(user, host, cwd);
-
         std::string line = readLineNice(prompt, commands, historyVec());
 
         appendHistory(historyVec(), line, 500);

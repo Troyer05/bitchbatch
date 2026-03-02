@@ -281,6 +281,8 @@ static void seedSandbox() {
     safeMkdirs(root);
     safeMkdirs(root / "docs");
     safeMkdirs(root / "projects" / "demo");
+    safeMkdirs(root / "projects" / "demo" / "src");
+    safeMkdirs(root / "projects" / "demo" / "conf");
 
     writeFile(root / "hello.txt",
               "Hello from BitchBatch Learn Mode!\n"
@@ -303,6 +305,19 @@ static void seedSandbox() {
               "1,markus,admin\n"
               "2,alex,user\n"
               "3,sam,user\n");
+
+    writeFile(root / "projects" / "demo" / "README.md",
+              "# demo\n"
+              "This is a sandbox project folder for learn mode.\n");
+
+    writeFile(root / "projects" / "demo" / "conf" / "app.conf",
+              "PORT=8080\n"
+              "MODE=dev\n"
+              "FEATURE_X=on\n");
+
+    writeFile(root / "projects" / "demo" / "src" / "main.c",
+              "#include <stdio.h>\n"
+              "int main(){ printf(\"hi\\n\"); return 0; }\n");
 
     writeFile(root / ".secret",
               "shh. hidden files start with a dot.\n");
@@ -343,12 +358,11 @@ static bool isBannedCommand(const string& raw, string& reason) {
         return true;
     }
 
-    
-    if (s.find(" >") != string::npos || startsWith(s, ">") || s.find(">>") != string::npos) {
-        reason = "redirects are blocked in exec mode (we still teach them)";
-        return true;
-    }
+    return false;
+}
 
+static bool hasRedirect(const string& raw) {
+    for (char c : raw) if (c == '>') return true;
     return false;
 }
 
@@ -363,6 +377,16 @@ static void runShellInSandbox(const string& userCmd) {
 
 static std::function<bool(const string&)> vExact(const string& exact) {
     return [exact](const string& s){ return trim(s) == exact; };
+}
+
+static std::function<bool(const string&)> vStarts(string p) {
+    p = trim(p);
+    return [p](const string& s){ return startsWith(trim(s), p); };
+}
+
+static std::function<bool(const string&)> vContains(string needle) {
+    needle = lower(trim(needle));
+    return [needle](const string& s){ return lower(s).find(needle) != string::npos; };
 }
 
 static std::function<bool(const string&)> vAnyOf(std::vector<std::function<bool(const string&)>> vs) {
@@ -478,8 +502,475 @@ static Chapter makeChapterBasics() {
     return ch;
 }
 
+static Chapter makeChapterFiles() {
+    Chapter ch;
+
+    ch.id = "files";
+    ch.title = "Files: erstellen, kopieren, bewegen";
+    ch.desc = "touch / mkdir / cp / mv / wildcards";
+
+    ch.steps.push_back(Text(
+        "0) Setup",
+        {
+            "Wir bleiben in der Sandbox.",
+            "Ziel: du lernst Dateien/Ordner zu erstellen und sauber zu kopieren/verschieben.",
+            "",
+            "Wichtig: rm ist im Learn Mode geblockt. Wir loeschen nichts."
+        },
+        RunMode::SAFE_NOEXEC
+    ));
+
+    ch.steps.push_back(Demo(
+        "1) touch: Datei anlegen",
+        {
+            "touch erstellt eine leere Datei (oder updated die Zeit).",
+            "Beispiel: touch demo.txt"
+        },
+        "touch demo.txt"
+    ));
+
+    ch.steps.push_back(Practice(
+        "2) Uebung: touch",
+        { "Erstelle eine Datei namens 'note.txt'." },
+        "note.txt existiert danach.",
+        "touch <dateiname>",
+        "touch note.txt",
+        vExact("touch note.txt")
+    ));
+
+    ch.steps.push_back(Demo(
+        "3) mkdir: Ordner anlegen",
+        {
+            "mkdir erstellt Ordner.",
+            "Mit -p kannst du verschachtelt erstellen: mkdir -p a/b/c"
+        },
+        "mkdir play"
+    ));
+
+    ch.steps.push_back(Practice(
+        "4) Uebung: mkdir -p",
+        { "Erstelle den Pfad 'play/a/b'." },
+        "Nutze mkdir -p damit es in einem go geht.",
+        "mkdir -p play/a/b",
+        "mkdir -p play/a/b",
+        vExact("mkdir -p play/a/b")
+    ));
+
+    ch.steps.push_back(Text(
+        "5) Wildcards (globbing)",
+        {
+            "Wildcards helfen dir mehrere Dateien auf einmal zu matchen.",
+            "  *   alles",
+            "  ?.txt  genau 1 Zeichen + .txt",
+            "  app.*  alles was mit app. startet",
+            "",
+            "Beispiel: ls *.txt"
+        }
+    ));
+
+    ch.steps.push_back(Practice(
+        "6) Uebung: ls *.txt",
+        { "Liste alle .txt Dateien im aktuellen Ordner." },
+        "ls *.txt",
+        "Wildcard: *.txt",
+        "ls *.txt",
+        vExact("ls *.txt")
+    ));
+
+    ch.steps.push_back(Text(
+        "7) cp / mv",
+        {
+            "cp kopiert Dateien/Ordner.",
+            "mv bewegt oder benennt um.",
+            "",
+            "Beispiele:",
+            "  cp note.txt play/",
+            "  mv demo.txt demo_old.txt"
+        }
+    ));
+
+    ch.steps.push_back(Practice(
+        "8) Uebung: cp",
+        { "Kopiere note.txt in den Ordner play." },
+        "cp <file> <ziel>/",
+        "Ziel ist ein Ordner: play/",
+        "cp note.txt play/",
+        vAnyOf({vExact("cp note.txt play/"), vExact("cp note.txt play")})
+    ));
+
+    ch.steps.push_back(Practice(
+        "9) Uebung: mv (umbenennen)",
+        { "Benenne demo.txt um zu demo_old.txt." },
+        "mv <alt> <neu>",
+        "mv demo.txt demo_old.txt",
+        "mv demo.txt demo_old.txt",
+        vExact("mv demo.txt demo_old.txt")
+    ));
+
+    ch.steps.push_back(Quiz(
+        "10) Mini-Quiz",
+        { "Kurz check:" },
+        "Welcher Befehl benennt eine Datei um?",
+        { {"A","cp",false}, {"B","mv",true}, {"C","touch",false} },
+        "mv bewegt oder benennt um."
+    ));
+
+    return ch;
+}
+
+static Chapter makeChapterViewText() {
+    Chapter ch;
+
+    ch.id = "text";
+    ch.title = "Text: anschauen und filtern";
+    ch.desc = "cat / less / head / tail";
+
+    ch.steps.push_back(Text(
+        "0) Warum Text-Tools?",
+        {
+            "Linux ist voll mit Logs, Configs und Textfiles.",
+            "Wenn du Text lesen kannst wie ein Pro, bist du 10x schneller.",
+            "",
+            "Wir nutzen dafuer app.log und users.csv in projects/demo."
+        }
+    ));
+
+    ch.steps.push_back(Practice(
+        "1) Uebung: cd projects/demo",
+        { "Wechsle in projects/demo." },
+        "cd projects/demo",
+        "cd projects/demo",
+        "cd projects/demo",
+        vExact("cd projects/demo")
+    ));
+
+    ch.steps.push_back(Demo(
+        "2) cat: alles ausgeben",
+        {
+            "cat zeigt den kompletten Inhalt.",
+            "Gut fuer kleine Files."
+        },
+        "cat users.csv"
+    ));
+
+    ch.steps.push_back(Demo(
+        "3) head / tail",
+        {
+            "head zeigt den Anfang, tail das Ende.",
+            "Mit -n kannst du Zeilen angeben.",
+            "Beispiel: tail -n 2 app.log"
+        },
+        "tail -n 2 app.log"
+    ));
+
+    ch.steps.push_back(Practice(
+        "4) Uebung: head -n 1 users.csv",
+        { "Zeig nur die Header-Zeile aus users.csv." },
+        "head -n 1 users.csv",
+        "Der Header ist die erste Zeile.",
+        "head -n 1 users.csv",
+        vExact("head -n 1 users.csv")
+    ));
+
+    ch.steps.push_back(Text(
+        "5) less",
+        {
+            "less ist wie ein Viewer.",
+            "Navigation:",
+            "  q    quit",
+            "  /x   suchen nach x",
+            "  n    next match",
+            "  g/G  top/bottom"
+        },
+        RunMode::SAFE_NOEXEC
+    ));
+
+    ch.steps.push_back(Practice(
+        "6) Uebung: less app.log",
+        { "Starte less auf app.log und beende mit q." },
+        "less app.log",
+        "Gib 'less app.log' ein, dann in less drueck q.",
+        "less app.log",
+        vExact("less app.log"),
+        RunMode::SAFE_NOEXEC
+    ));
+
+    ch.steps.push_back(Quiz(
+        "7) Mini-Quiz",
+        { "Noch ein Check:" },
+        "Mit welchem Befehl siehst du die letzten Zeilen einer Datei?",
+        { {"A","tail",true}, {"B","head",false}, {"C","pwd",false} },
+        "tail zeigt das Ende."
+    ));
+
+    return ch;
+}
+
+static Chapter makeChapterSearch() {
+    Chapter ch;
+
+    ch.id = "search";
+    ch.title = "Search: grep + find";
+    ch.desc = "grep / find / einfache Patterns";
+
+    ch.steps.push_back(Text(
+        "0) Der Plan",
+        {
+            "Du willst Dinge finden: Text in Files, oder Files im System.",
+            "In der Sandbox ist alles klein, aber das Prinzip ist identisch.",
+            "",
+            "Wir nutzen projects/demo/app.log und docs/notes.txt"
+        }
+    ));
+
+    ch.steps.push_back(Practice(
+        "1) Uebung: zur Sandbox root",
+        { "Geh zurueck in den Sandbox Root (nicht /)." },
+        "cd .. bis du wieder oben bist.",
+        "Du warst in projects/demo. Zwei mal cd .. bringt dich nach oben.",
+        "cd ../..",
+        vAnyOf({vExact("cd ../.."), vExact("cd ../../"), vExact("cd ..")})
+    ));
+
+    ch.steps.push_back(Demo(
+        "2) grep: Text suchen",
+        {
+            "grep <pattern> <file>",
+            "Beispiel: grep ERROR projects/demo/app.log"
+        },
+        "grep ERROR projects/demo/app.log"
+    ));
+
+    ch.steps.push_back(Practice(
+        "3) Uebung: grep WARN",
+        { "Suche nach WARN in projects/demo/app.log." },
+        "grep WARN projects/demo/app.log",
+        "Grep Syntax: grep <PATTERN> <FILE>",
+        "grep WARN projects/demo/app.log",
+        vExact("grep WARN projects/demo/app.log")
+    ));
+
+    ch.steps.push_back(Text(
+        "4) grep Flags",
+        {
+            "Nutzbare Flags:",
+            "  -n   Zeilennummern",
+            "  -i   ignore case",
+            "  -r   rekursiv (ganzer Ordner)",
+            "",
+            "Beispiel: grep -in error projects/demo/app.log"
+        }
+    ));
+
+    ch.steps.push_back(Practice(
+        "5) Uebung: grep -n",
+        { "Zeig dir ERROR mit Zeilennummern." },
+        "grep -n ERROR projects/demo/app.log",
+        "Flag -n",
+        "grep -n ERROR projects/demo/app.log",
+        vExact("grep -n ERROR projects/demo/app.log")
+    ));
+
+    ch.steps.push_back(Demo(
+        "6) find: Dateien finden",
+        {
+            "find <path> -name <pattern>",
+            "Beispiel: find . -name '*.txt'"
+        },
+        "find . -name '*.txt'"
+    ));
+
+    ch.steps.push_back(Practice(
+        "7) Uebung: find users.csv",
+        { "Finde users.csv irgendwo in der Sandbox." },
+        "find . -name users.csv",
+        "Name ohne Wildcard geht auch.",
+        "find . -name users.csv",
+        vExact("find . -name users.csv")
+    ));
+
+    ch.steps.push_back(Quiz(
+        "8) Mini-Quiz",
+        { "Fix noch:" },
+        "Was macht grep?",
+        { {"A","findet Text in Dateien",true}, {"B","zeigt deinen Ordner",false}, {"C","wechselt Ordner",false} },
+        "grep sucht Text-Pattern in Dateien."
+    ));
+
+    return ch;
+}
+
+static Chapter makeChapterPipesAndRedirects() {
+    Chapter ch;
+
+    ch.id = "pipes";
+    ch.title = "Pipes + Redirects";
+    ch.desc = "| / > / >> / 2> (theory + safe practice)";
+
+    ch.steps.push_back(Text(
+        "0) Idee: Output zu Input",
+        {
+            "Eine Pipe '|' nimmt stdout vom linken Befehl und gibt ihn als stdin rechts rein.",
+            "Das ist das Linux-Superpower Ding.",
+            "",
+            "Redirects schreiben Output in Dateien:",
+            "  >   overwrite",
+            "  >>  append",
+            "  2>  stderr"
+        },
+        RunMode::SAFE_NOEXEC
+    ));
+
+    ch.steps.push_back(Demo(
+        "1) Pipe Demo: grep + wc",
+        {
+            "Wir filtern app.log und zaehlen Treffer.",
+            "wc -l zaehlt Zeilen."
+        },
+        "cat projects/demo/app.log | grep INFO | wc -l"
+    ));
+
+    ch.steps.push_back(Practice(
+        "2) Uebung: grep ERROR | wc -l",
+        { "Zaehle wie viele ERROR Zeilen in app.log sind." },
+        "cat ... | grep ... | wc -l",
+        "Pattern ERROR",
+        "cat projects/demo/app.log | grep ERROR | wc -l",
+        vContains("| grep")
+    ));
+
+    ch.steps.push_back(Text(
+        "3) Redirects (safe)",
+        {
+            "In Learn Mode fuehren wir Redirects nicht aus, aber du lernst die Syntax.",
+            "Beispiele:",
+            "  echo hello > out.txt",
+            "  echo again >> out.txt",
+            "",
+            "Warum? Weil '>' schnell mal was ueberschreibt und das wollen wir safe halten."
+        },
+        RunMode::SAFE_NOEXEC
+    ));
+
+    ch.steps.push_back(Practice(
+        "4) Uebung: echo hello > out.txt",
+        { "Gib den Redirect-Befehl exakt ein (wird NICHT ausgefuehrt)." },
+        "Syntax merken.",
+        "echo hello > out.txt",
+        "echo hello > out.txt",
+        vExact("echo hello > out.txt"),
+        RunMode::SAFE_NOEXEC
+    ));
+
+    ch.steps.push_back(Practice(
+        "5) Uebung: append",
+        { "Gib einen Append-Redirect ein (wird NICHT ausgefuehrt)." },
+        "Syntax: >>",
+        "echo again >> out.txt",
+        "echo again >> out.txt",
+        vExact("echo again >> out.txt"),
+        RunMode::SAFE_NOEXEC
+    ));
+
+    ch.steps.push_back(Quiz(
+        "6) Mini-Quiz",
+        { "Letzter Check:" },
+        "Was macht '>>'?",
+        { {"A","schreibt ans Ende (append)",true}, {"B","ueberschreibt Datei",false}, {"C","pipe",false} },
+        "'>>' append. '>' overwrite."
+    ));
+
+    return ch;
+}
+
+static Chapter makeChapterShellDaily() {
+    Chapter ch;
+
+    ch.id = "daily";
+    ch.title = "Daily Shell: history, env";
+    ch.desc = "echo / env / history";
+
+    ch.steps.push_back(Text(
+        "0) Bash Basics",
+        {
+            "Ein paar Sachen, die du jeden Tag brauchst:",
+            "  echo text",
+            "  echo $HOME",
+            "  env | grep PATH",
+            "",
+            "Diese Dinge sind nicht scary, aber super nuetzlich."
+        }
+    ));
+
+    ch.steps.push_back(Demo(
+        "1) echo",
+        { "echo gibt Text aus." },
+        "echo hello"
+    ));
+
+    ch.steps.push_back(Demo(
+        "2) Variablen",
+        {
+            "Mit $ greifst du auf ENV vars zu.",
+            "Beispiel: echo $HOME"
+        },
+        "echo $HOME"
+    ));
+
+    ch.steps.push_back(Demo(
+        "3) env",
+        {
+            "env zeigt Environment Variablen.",
+            "Mit grep kannst du filtern."
+        },
+        "env | grep PATH"
+    ));
+
+    ch.steps.push_back(Practice(
+        "4) Uebung: echo $USER",
+        { "Gib deinen User aus." },
+        "echo $USER",
+        "$USER",
+        "echo $USER",
+        vExact("echo $USER")
+    ));
+
+    ch.steps.push_back(Text(
+        "5) history",
+        {
+            "history zeigt dir deine letzten Befehle.",
+            "Beispiele:",
+            "  history",
+            "  history | tail",
+            "",
+            "Pro Tipp: mit STRG+R kannst du suchen (reverse search)."
+        },
+        RunMode::SAFE_NOEXEC
+    ));
+
+    ch.steps.push_back(Practice(
+        "6) Uebung: history",
+        { "Tippe 'history' (nur Syntax check, nicht executed)." },
+        "history",
+        "history",
+        "history",
+        vExact("history"),
+        RunMode::SAFE_NOEXEC
+    ));
+
+    ch.steps.push_back(Quiz(
+        "7) Mini-Quiz",
+        { "Ok:" },
+        "Was gibt 'echo $HOME' aus?",
+        { {"A","Home-Ordner Pfad",true}, {"B","CPU Temperatur",false}, {"C","den Kernel",false} },
+        "$HOME ist dein Home directory."
+    ));
+
+    return ch;
+}
+
 static std::vector<Chapter> buildChapters() {
-    return { makeChapterBasics() };
+    return { makeChapterBasics(), makeChapterFiles(), makeChapterViewText(), makeChapterSearch(), makeChapterPipesAndRedirects(), makeChapterShellDaily() };
 }
 
 static int menuPick(const std::vector<Chapter>& chapters) {
@@ -547,11 +1038,27 @@ static void runStepDemo(const Step& st, bool pauseAfterExec) {
 }
 
 static bool runPracticeAttempt(const Step& st, const string& in, bool pauseAfterExec) {
+    if (st.runMode == RunMode::SAFE_NOEXEC) {
+        printCmdLine(in);
+        cout << Color::YELLOW << "(not executed in SAFE_NOEXEC)" << Color::RESET << "\n\n";
+        pauseIf(pauseAfterExec);
+        
+        if (!st.validate) return true;
+        
+        return st.validate(in);
+    }
+
     string reason;
 
     if (isBannedCommand(in, reason)) {
         cout << Color::RED << "Blocked in learn mode: " << reason << Color::RESET << "\n\n";
         return false;
+    }
+
+    if (hasRedirect(in)) {
+        cout << Color::YELLOW << "Blocked in learn mode: redirects are not executed here" << Color::RESET << "\n\n";
+        if (!st.validate) return true;
+        return st.validate(in);
     }
 
     printCmdLine(in);
