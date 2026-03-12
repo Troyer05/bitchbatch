@@ -42,8 +42,10 @@ static int termCols() {
 
 static int widthUtf8Prefix(const std::string& s, size_t bytes) {
     std::mbstate_t st{};
+
     int w = 0;
     const char* p = s.data();
+
     size_t n = std::min(bytes, s.size());
     size_t i = 0;
 
@@ -52,16 +54,20 @@ static int widthUtf8Prefix(const std::string& s, size_t bytes) {
         size_t r = std::mbrtowc(&wc, p + i, n - i, &st);
 
         if (r == (size_t)-2) break;
+
         if (r == (size_t)-1) {
             std::memset(&st, 0, sizeof(st));
+
             w += 1;
             i += 1;
+
             continue;
         }
 
         if (r == 0) break;
 
         int cw = ::wcwidth(wc);
+
         if (cw < 0) cw = 1;
 
         w += cw;
@@ -69,10 +75,6 @@ static int widthUtf8Prefix(const std::string& s, size_t bytes) {
     }
 
     return w;
-}
-
-static int widthUtf8(const std::string& s) {
-    return widthUtf8Prefix(s, s.size());
 }
 
 static int widthAnsi(const std::string& s) {
@@ -83,14 +85,17 @@ static int widthAnsi(const std::string& s) {
 
         if (c == 0x1B && i + 1 < s.size() && s[i + 1] == '[') {
             i += 2;
+
             while (i < s.size()) {
                 unsigned char x = (unsigned char)s[i++];
                 if (x >= 0x40 && x <= 0x7E) break;
             }
+
             continue;
         }
 
         size_t start = i;
+
         while (i < s.size()) {
             unsigned char x = (unsigned char)s[i];
             if (x == 0x1B && i + 1 < s.size() && s[i + 1] == '[') break;
@@ -103,44 +108,98 @@ static int widthAnsi(const std::string& s) {
     return w;
 }
 
-static std::vector<std::string> splitLines(const std::string& s) {
-    std::vector<std::string> out;
-    std::string cur;
 
-    for (char ch : s) {
-        if (ch == '\n') {
-            out.push_back(cur);
-            cur.clear();
-        } else {
-            cur.push_back(ch);
+struct VisualPos {
+    int lines = 1;
+    int lastCol = 0;
+};
+
+static VisualPos measureMixed(const std::string& prompt, const std::string& buf, size_t bufBytes) {
+    const int cols = std::max(1, termCols());
+
+    VisualPos out;
+
+    auto advance = [&](int w) {
+        int rem = w;
+
+        while (rem > 0) {
+            int space = cols - out.lastCol;
+
+            if (space <= 0) {
+                out.lines++;
+                out.lastCol = 0;
+                space = cols;
+            }
+
+            if (rem < space) {
+                out.lastCol += rem;
+                rem = 0;
+            } else {
+                rem -= space;
+                out.lines++;
+                out.lastCol = 0;
+            }
         }
-    }
+    };
 
-    out.push_back(cur);
+    auto consume = [&](const std::string& s, bool ansiAware) {
+        for (size_t i = 0; i < s.size();) {
+            unsigned char c = (unsigned char)s[i];
+
+            if (c == '\n') {
+                out.lines++;
+                out.lastCol = 0;
+                i++;
+
+                continue;
+            }
+
+            if (c == '\r') {
+                out.lastCol = 0;
+                i++;
+
+                continue;
+            }
+
+            if (ansiAware && c == 0x1B && i + 1 < s.size() && s[i + 1] == '[') {
+                i += 2;
+
+                while (i < s.size()) {
+                    unsigned char x = (unsigned char)s[i++];
+                    if (x >= 0x40 && x <= 0x7E) break;
+                }
+
+                continue;
+            }
+
+            size_t start = i;
+
+            while (i < s.size()) {
+                unsigned char x = (unsigned char)s[i];
+                if (x == '\n' || x == '\r') break;
+                if (ansiAware && x == 0x1B && i + 1 < s.size() && s[i + 1] == '[') break;
+                i++;
+            }
+
+            int w = widthUtf8Prefix(s.substr(start, i - start), i - start);
+
+            advance(w);
+        }
+    };
+
+    consume(prompt, true);
+    consume(buf.substr(0, std::min(bufBytes, buf.size())), false);
 
     return out;
 }
 
 static void redraw(const std::string& prompt, const std::string& buf, size_t cur) {
     static int lastTotalLines = 0;
-    const int cols = termCols();
 
-    auto plines = splitLines(prompt);
+    VisualPos endPos = measureMixed(prompt, buf, buf.size());
+    VisualPos curPos = measureMixed(prompt, buf, cur);
 
-    const int promptLines = (int)plines.size();
-    const int promptLastVis = widthAnsi(plines.empty() ? "" : plines.back());
-    const int bufVis = widthUtf8(buf);
-    const int inputTotal = promptLastVis + bufVis;
-    const int inputLines = (inputTotal / cols) + 1;
-
-    int totalLinesNow = (promptLines - 1) + inputLines;
-
-    if (totalLinesNow < 1) totalLinesNow = 1;
-
-    const int bufVisCur = widthUtf8Prefix(buf, cur);
-    const int cursorPos = promptLastVis + bufVisCur;
-    const int curLine = cursorPos / cols;
-    const int curCol  = cursorPos % cols;
+    int totalLinesNow = std::max(1, endPos.lines);
 
     std::cout << "\r";
 
@@ -155,16 +214,13 @@ static void redraw(const std::string& prompt, const std::string& buf, size_t cur
 
     std::cout << "\r" << prompt << buf;
 
-    const int endPos  = promptLastVis + bufVis;
-    const int endLine = endPos / cols;
-    const int endCol  = endPos % cols;
-    const int up = endLine - curLine;
+    int up = endPos.lines - curPos.lines;
 
     if (up > 0) std::cout << "\033[" << up << "A";
 
     std::cout << "\r";
 
-    if (curCol > 0) std::cout << "\033[" << curCol << "C";
+    if (curPos.lastCol > 0) std::cout << "\033[" << curPos.lastCol << "C";
 
     std::cout << std::flush;
 
@@ -207,16 +263,124 @@ struct TermRaw {
             raw.c_cc[VTIME] = 0;
 
             ok = (tcsetattr(STDIN_FILENO, TCSANOW, &raw) == 0);
+
+            if (ok) std::cout << "\033[?2004h" << std::flush;
         }
     }
 
     ~TermRaw() {
-        if (ok) tcsetattr(STDIN_FILENO, TCSANOW, &old);
+        if (ok) {
+            std::cout << "\033[?2004l" << std::flush;
+            tcsetattr(STDIN_FILENO, TCSANOW, &old);
+        }
     }
 };
 
 static bool readByte(unsigned char& c) {
     return read(STDIN_FILENO, &c, 1) == 1;
+}
+
+static std::string normalizePaste(const std::string& s) {
+    std::string out;
+    out.reserve(s.size());
+
+    for (size_t i = 0; i < s.size(); i++) {
+        char c = s[i];
+
+        if (c == '\r') {
+            if (i + 1 < s.size() && s[i + 1] == '\n') continue;
+            out.push_back('\n');
+            continue;
+        }
+
+        out.push_back(c);
+    }
+
+    while (!out.empty() && (out.back() == '\n' || out.back() == '\r')) out.pop_back();
+
+    return out;
+}
+
+static bool readBracketedPaste(std::string& out) {
+    std::string raw;
+
+    while (true) {
+        unsigned char c = 0;
+
+        if (!readByte(c)) return false;
+
+        if (c == 0x1B) {
+            unsigned char a = 0;
+            unsigned char b = 0;
+            unsigned char d = 0;
+            unsigned char e = 0;
+            unsigned char f = 0;
+
+            if (!readByteTimeout(a, 10)) {
+                raw.push_back((char)c);
+                continue;
+            }
+
+            if (!readByteTimeout(b, 10)) {
+                raw.push_back((char)c);
+                raw.push_back((char)a);
+
+                continue;
+            }
+
+            if (a == '[' && b == '2') {
+                if (!readByteTimeout(d, 10)) {
+                    raw.push_back((char)c);
+                    raw.push_back((char)a);
+                    raw.push_back((char)b);
+
+                    continue;
+                }
+
+                if (!readByteTimeout(e, 10)) {
+                    raw.push_back((char)c);
+                    raw.push_back((char)a);
+                    raw.push_back((char)b);
+                    raw.push_back((char)d);
+
+                    continue;
+                }
+
+                if (!readByteTimeout(f, 10)) {
+                    raw.push_back((char)c);
+                    raw.push_back((char)a);
+                    raw.push_back((char)b);
+                    raw.push_back((char)d);
+                    raw.push_back((char)e);
+
+                    continue;
+                }
+
+                if (d == '0' && e == '1' && f == '~') break;
+
+                raw.push_back((char)c);
+                raw.push_back((char)a);
+                raw.push_back((char)b);
+                raw.push_back((char)d);
+                raw.push_back((char)e);
+                raw.push_back((char)f);
+
+                continue;
+            }
+
+            raw.push_back((char)c);
+            raw.push_back((char)a);
+            raw.push_back((char)b);
+
+            continue;
+        }
+
+        raw.push_back((char)c);
+    }
+
+    out = normalizePaste(raw);
+
+    return true;
 }
 
 
@@ -623,10 +787,36 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
         }
 
         if (c == 27) {
-            unsigned char a = 0, b = 0;
+            unsigned char a = 0;
+            unsigned char b = 0;
+            unsigned char d = 0;
+            unsigned char e = 0;
 
-            if (!readByte(a)) continue;
-            if (!readByte(b)) continue;
+            if (!readByteTimeout(a, 10)) continue;
+            if (!readByteTimeout(b, 10)) continue;
+
+            if (a == '[' && b == '2') {
+                if (!readByteTimeout(d, 10)) continue;
+                if (!readByteTimeout(e, 10)) continue;
+
+                if (d == '0' && e == '0') {
+                    unsigned char f = 0;
+                    
+                    if (!readByteTimeout(f, 10)) continue;
+
+                    if (f == '~') {
+                        std::string pasted;
+
+                        if (readBracketedPaste(pasted) && !pasted.empty()) {
+                            buf.insert(cur, pasted);
+                            cur += pasted.size();
+                            redraw(prompt, buf, cur);
+                        }
+
+                        continue;
+                    }
+                }
+            }
 
             if (a == '[') {
                 if (b == '3') {
@@ -661,7 +851,7 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                     continue;
                 }
 
-                if (b == 'A') { // UP
+                if (b == 'A') {
                     if (!hist.empty() && histPos > 0) {
                         if (histPos == (long)hist.size()) histSaved = buf;
 
@@ -677,7 +867,7 @@ std::string readLineNice(const std::string& prompt, const CommandMap& commands, 
                     continue;
                 }
 
-                if (b == 'B') { // DOWN
+                if (b == 'B') {
                     if (histPos < (long)hist.size()) {
                         histPos++;
 
